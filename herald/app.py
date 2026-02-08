@@ -13,7 +13,8 @@ class HeraldApp:
     def __init__(self):
         """Initialize the Herald application."""
         self.uuid = uuid.uuid4()
-        self.session = SQLiteSession(session_id=str(self.uuid), db_path="herald_traces.db")
+        # ":memory:" for in-memory database, "herald_traces.db" for file-based persistence
+        self.session = SQLiteSession(session_id=str(self.uuid), db_path="herald_traces.db")  
 
     def herald_agent(self):
         """Heralder Agent for CV conversations"""
