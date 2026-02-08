@@ -78,6 +78,8 @@ if __name__ == "__main__":
     browser_based = os.getenv("WITH_BROWSER", "no")
 
     if browser_based == "yes":
-        ui_debug()
+        # ui_debug()
+        gr.ChatInterface(HeraldApp().run).launch()
+
     else:  # Run on terminal
         asyncio.run(terminal_ui())
