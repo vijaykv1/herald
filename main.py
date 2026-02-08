@@ -66,7 +66,7 @@ async def terminal_ui():
         
         console.print("\n[bold blue]Answer:[/bold blue]")
         
-        async for chunk in HeraldApp().run(query=query):
+        async for chunk in HeraldApp().run(message=query, history=[]):
             console.print(chunk)
         
         console.print()
@@ -74,12 +74,20 @@ async def terminal_ui():
 
 if __name__ == "__main__":
 
-    # Get user selection for Browser based UI or terminal UI
-    browser_based = os.getenv("WITH_BROWSER", "no")
+    try: 
+        # Get user selection for Browser based UI or terminal UI
+        browser_based = os.getenv("WITH_BROWSER", "no")
 
-    if browser_based == "yes":
-        # ui_debug()
-        gr.ChatInterface(HeraldApp().run).launch()
+        if browser_based == "yes":
+            # ui_debug()
+            gr.ChatInterface(HeraldApp().run).launch()
 
-    else:  # Run on terminal
-        asyncio.run(terminal_ui())
+        else:  # Run on terminal
+            asyncio.run(terminal_ui())
+    
+    finally:  # clean up workspace by removing the traces db after the run
+        print("Cleaning up traces database...")
+        for fname in ["herald_traces.db", "herald_traces.db-shm", "herald_traces.db-wal"]:
+            if os.path.exists(fname):
+                print(f"Cleaning up {fname}...")
+                os.remove(fname)
