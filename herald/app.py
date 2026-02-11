@@ -3,7 +3,7 @@
 import uuid
 from agents import Agent, Runner, trace, gen_trace_id, SQLiteSession
 
-from herald.context import HeraldPrompter
+from herald.context_manager.icontext import ContextInterface
 
 # import herald.response_handles as resp_handles
 
@@ -11,17 +11,22 @@ from herald.context import HeraldPrompter
 class HeraldApp:
     """Herald application."""
 
-    def __init__(self):
-        """Initialize the Herald application."""
+    def __init__(self, prompt: ContextInterface):
+        """Initialize the Herald application.
+
+        :param ContextInterface prompt: The context interface for the application,
+        which provides the necessary context for the agent to operate.
+        """
         self.uuid = uuid.uuid4()
         # ":memory:" for in-memory database, "herald_traces.db" for file-based persistence
         self.session = SQLiteSession(session_id=str(self.uuid), db_path="herald_traces.db")
+        self.prompt = prompt
 
     def herald_agent(self):
         """Heralder Agent for CV conversations"""
         return Agent(
             name="heralder",
-            instructions=HeraldPrompter.get_basic_system_instructions(),
+            instructions=self.prompt.get_system_instructions(),
             model="gpt-5-nano",
             # output_type=resp_handles.CVResponse
         )

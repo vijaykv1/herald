@@ -1,34 +1,30 @@
 """File containing all the context classes for the herald package."""
 
 import os
-import pymupdf4llm
+
+from herald.context_manager.icontext import ContextInterface
 
 
-class HeraldPrompter:
+class HeraldBasicPrompter(ContextInterface):
     """Herald Prompt options."""
 
-    @staticmethod
-    def prepare_cv_content(cv_pdf_file: str = None) -> str:
-        """Prepare CV pdf content for the prompt.
-
-        .. note::
-            CV file can be loaded via Environment var ``CV_PATH``
+    def __init__(self, cv_pdf_file: str = None):
+        """Initialize the Herald Prompt options.
 
         :param str cv_pdf_file: PDF file with CV content, optional
-        :return: CV content string
+        """
+        super().__init__(cv_pdf_file=cv_pdf_file)
+
+    @property
+    def type(self) -> str:
+        """Get the type of the Context Interface.
+
+        :return: Type of the Context Interface
         :rtype: str
         """
-        # if cv_pdf_file is not set, then an attempt is made to read from the env variables
-        if cv_pdf_file is None:
-            cv_pdf_file = os.getenv("CV_PATH")
+        return "basic_prompt"
 
-        if not os.path.exists(cv_pdf_file) or cv_pdf_file is None:
-            raise ValueError(f"The CV pdf {cv_pdf_file} does not exist! Please provide a valid one.")
-
-        return pymupdf4llm.to_markdown(cv_pdf_file)
-
-    @classmethod
-    def get_basic_system_instructions(cls) -> str:
+    def get_system_instructions(self) -> str:
         """Get the System instructions for Heralder Agent.
 
         This system instructions is rudimentary and works in the following way.
@@ -40,9 +36,8 @@ class HeraldPrompter:
         :return: System prompt for Agent
         :rtype: str
         """
-
         # read CV content
-        cv_content = cls.prepare_cv_content()
+        cv_content = self._cv_md_content
 
         # Get the name of the person from env variable, if not set then use a default name
         name = os.getenv("ME", "The Candidate")
@@ -98,6 +93,6 @@ class HeraldPrompter:
 #     # load complete dotenv here
 #     dotenv.load_dotenv()
 
-#     p_cl = HeraldPrompter()
-#     prompt = p_cl.get_basic_system_instructions()
+#     p_cl = HeraldBasicPrompter()
+#     prompt = p_cl.get_system_instructions()
 #     print(prompt)
