@@ -1,4 +1,5 @@
 """File containing all the context classes for the herald package."""
+
 import os
 import pymupdf4llm
 
@@ -10,9 +11,9 @@ class HeraldPrompter:
     def prepare_cv_content(cv_pdf_file: str = None) -> str:
         """Prepare CV pdf content for the prompt.
 
-        .. note:: 
+        .. note::
             CV file can be loaded via Environment var ``CV_PATH``
-        
+
         :param str cv_pdf_file: PDF file with CV content, optional
         :return: CV content string
         :rtype: str
@@ -22,10 +23,8 @@ class HeraldPrompter:
             cv_pdf_file = os.getenv("CV_PATH")
 
         if not os.path.exists(cv_pdf_file) or cv_pdf_file is None:
-            raise ValueError(
-                f"The CV pdf {cv_pdf_file} does not exist! Please provide a valid one."
-            )
-        
+            raise ValueError(f"The CV pdf {cv_pdf_file} does not exist! Please provide a valid one.")
+
         return pymupdf4llm.to_markdown(cv_pdf_file)
 
     @classmethod
@@ -37,7 +36,7 @@ class HeraldPrompter:
         1. First read the CV and prepare it in the markdown format
         2. Prepare the system prompt for the Agent to efficiently answer the user's question.
         3. Pass the CV content into the final prompt for clarity to Agent
-    
+
         :return: System prompt for Agent
         :rtype: str
         """
@@ -89,7 +88,7 @@ class HeraldPrompter:
     A: [Provide degree(s), institution(s), graduation year(s), and any relevant honors/coursework mentioned]
 
     Q: "Are you familiar with cloud platforms?"
-    A: [List specific platforms mentioned, or state if none are listed]""" 
+    A: [List specific platforms mentioned, or state if none are listed]"""
 
 
 # if __name__ == '__main__':
@@ -102,4 +101,3 @@ class HeraldPrompter:
 #     p_cl = HeraldPrompter()
 #     prompt = p_cl.get_basic_system_instructions()
 #     print(prompt)
-
