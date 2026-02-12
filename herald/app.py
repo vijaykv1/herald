@@ -1,11 +1,13 @@
 """Application entry point for the herald package."""
 
+import os
 import uuid
 from agents import Agent, Runner, trace, gen_trace_id, SQLiteSession
 
 from herald.context_manager.icontext import ContextInterface
+from herald.context_manager.rag import CVVectorStore
 
-# import herald.response_handles as resp_handles
+from herald.cv_parser.linkedin import LinkedInCVParser
 
 
 class HeraldApp:
@@ -22,14 +24,35 @@ class HeraldApp:
         self.session = SQLiteSession(session_id=str(self.uuid), db_path="herald_traces.db")
         self.prompt = prompt
 
+        # initialize the vector store if the prompt type is RAG based
+        self.vector_store = None
+        if self.prompt.type == "rag_based":
+            cv_type = os.getenv("CV_TYPE", "linkedin")
+
+            if cv_type == "linkedin":
+                cv_parser = LinkedInCVParser(cv=self.prompt.cv_md_content)
+            else:
+                raise ValueError(f"Unsupported CV type: {cv_type}")
+
+            # perform parse to get the chunked data ready for vector store creation
+            cv_chunks = cv_parser.parse()
+            self.vector_store = CVVectorStore(cv_chunks=cv_chunks)  # type: ignore
+
     def herald_agent(self):
         """Heralder Agent for CV conversations"""
-        return Agent(
-            name="heralder",
-            instructions=self.prompt.get_system_instructions(),
-            model="gpt-5-nano",
-            # output_type=resp_handles.CVResponse
-        )
+
+        agent_options = {
+            "name": "heralder",
+            "instructions": self.prompt.get_system_instructions(),
+            "model": "gpt-5-nano",
+            "tools": [self.vector_store.retrieve_relevant_chunks],
+        }
+
+        # Add vector store retriever to the agent options if the prompt type is RAG based
+        if self.prompt.type == "rag_based":
+            agent_options["tools"] = [self.vector_store.retrieve_relevant_chunks]
+
+        return Agent(**agent_options)
 
     async def run(self, message: str, history: list):
         """

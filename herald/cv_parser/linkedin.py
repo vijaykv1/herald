@@ -148,13 +148,13 @@ class LinkedInCVParser(CVParserInterface):
         return jobs
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     import pprint
+    import pprint
 
-#     with open("/Users/Q558981/workspace/personal/herald/data/cv.md", mode="r", encoding="utf-8") as f:
-#         cv_content = f.read()
-#     parser = LinkedInCVParser(cv_content)
-#     parsed_cv = parser.parse()
+    with open("/Users/Q558981/workspace/personal/herald/data/cv.md", mode="r", encoding="utf-8") as f:
+        cv_content = f.read()
+    parser = LinkedInCVParser(cv_content)
+    parsed_cv = parser.parse()
 
-#     pprint.pprint(parsed_cv, indent=2)
+    pprint.pprint(parsed_cv, indent=2)
