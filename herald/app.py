@@ -45,7 +45,6 @@ class HeraldApp:
             "name": "heralder",
             "instructions": self.prompt.get_system_instructions(),
             "model": "gpt-5-nano",
-            "tools": [self.vector_store.retrieve_relevant_chunks],
         }
 
         # Add vector store retriever to the agent options if the prompt type is RAG based
