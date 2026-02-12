@@ -5,6 +5,7 @@ This module implements a context manager that retrieves relevant information to 
 
 import chromadb
 from openai import OpenAI
+from agents.tool import function_tool
 
 
 class CVVectorStore:
@@ -20,7 +21,7 @@ class CVVectorStore:
         # create a embeddings collection in chromadb for storing the CV chunks
         self.__cv_collection = chromadb.Client(
             settings=chromadb.config.Settings(persist_directory=chromadb_local_path)
-        ).create_collection(name="CV")
+        ).create_collection(name="cv_lookup")
 
     def __normalize_chunk(self, chunk: dict) -> str:
         """Normalize the text for better retrieval."""
@@ -62,7 +63,6 @@ class CVVectorStore:
         """
         Retrieve relevant chunks from the vector store based on the query using cosine similarity search.
 
-
         :param str query: The query string to search for relevant CV chunks.
         :param int top_k: The number of top relevant chunks to retrieve.
         :return: A list of relevant CV chunk texts.
@@ -83,3 +83,21 @@ class CVVectorStore:
         docs = results.get("documents", [])  # get the documents from the results, default to empty list if not found
 
         return docs[0] if docs else []
+    
+    def create_tool(self):
+        """Create a tool wrapper for the retrieve_relevant_chunks method."""
+        @function_tool
+        def retrieve_relevant_chunks(query: str, top_k: int = 4) -> list:
+            """
+            Retrieve relevant chunks from the CV based on the query using cosine similarity search.
+
+            Args:
+                query: The query string to search for relevant CV chunks.
+                top_k: The number of top relevant chunks to retrieve (default: 4).
+
+            Returns:
+                A list of relevant CV chunk texts.
+            """
+            return self.retrieve_relevant_chunks(query, top_k)
+        
+        return retrieve_relevant_chunks

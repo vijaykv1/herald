@@ -49,7 +49,7 @@ class HeraldApp:
 
         # Add vector store retriever to the agent options if the prompt type is RAG based
         if self.prompt.type == "rag_based":
-            agent_options["tools"] = [self.vector_store.retrieve_relevant_chunks]
+            agent_options["tools"] = [self.vector_store.create_tool()]
 
         return Agent(**agent_options)
 
