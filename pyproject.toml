@@ -28,6 +28,9 @@ dev = [
     "pytest-mock>=3.12.0",
 ]
 
+[tool.pylint.main]
+ignore = ["tests", "data", ".venv", "venv"]
+
 [tool.pylint.format]
 max-line-length = 120
 

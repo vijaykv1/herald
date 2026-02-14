@@ -389,5 +389,3 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 For issues, questions, or contributions, please open an issue on the [GitHub repository](https://github.com/vijaykv1/herald).
 
 ---
-
-Made with ❤️ by the Herald team
