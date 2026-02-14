@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "herald"
 version = "0.1.0"
@@ -16,8 +20,24 @@ dependencies = [
     "tqdm>=4.67.3",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+]
+
+[tool.pylint.main]
+ignore = ["tests", "data", ".venv", "venv"]
+
 [tool.pylint.format]
 max-line-length = 120
 
 [tool.pylint."messages control"]
 disable = ["fixme"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["herald*"]
+exclude = ["tests*", "data*"]
