@@ -1,6 +1,5 @@
 """Application entry point for the herald package."""
 
-import os
 import uuid
 from agents import Agent, Runner, trace, gen_trace_id, SQLiteSession
 
@@ -36,7 +35,7 @@ class HeraldApp:
 
         return Agent(**agent_options)
 
-    async def run(self, message: str, history: list):
+    async def run(self, message: str, history: list):  # pylint: disable=unused-argument
         """
         Run query on the CV provided
 

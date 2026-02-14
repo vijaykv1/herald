@@ -44,6 +44,8 @@ class HeraldRAGContextManager(ContextInterface):
         :rtype: str
         """
         name = os.getenv("ME", "The Candidate")
+
+        # pylint: disable=line-too-long
         return f"""You are a helpful assistant that answers questions about {name}'s professional background and qualifications.
 
 ## Your Capabilities

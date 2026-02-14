@@ -48,7 +48,6 @@ class CVVectorStore:
             normalized_text = self.__normalize_chunk(chunk)
 
             # TODO: clean the text if needed (e.g., remove extra whitespace, special characters, etc.)
-
             # Create embeddings of the current chunk using OpenAI embeddings API
             embedding = self.__client.embeddings.create(input=normalized_text, model="text-embedding-3-small")
 
