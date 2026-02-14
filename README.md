@@ -1,6 +1,7 @@
 # 🎺 Herald
 
 [![Pylint](https://github.com/vijaykv1/herald/actions/workflows/pylint.yml/badge.svg)](https://github.com/vijaykv1/herald/actions/workflows/pylint.yml)
+[![Tests](https://github.com/vijaykv1/herald/actions/workflows/tests.yml/badge.svg)](https://github.com/vijaykv1/herald/actions/workflows/tests.yml)
 
 **Herald** is an intelligent AI-powered chatbot that acts as your personal representative, answering questions about your 
 professional background, skills, and experience based on your CV or LinkedIn profile.
@@ -290,13 +291,36 @@ This launches a web interface accessible at `http://localhost:7860` (or another 
 
 ### Running Tests
 
+The project includes a comprehensive test suite with unit and integration tests. Tests use mocking extensively to avoid external dependencies.
+
 ```bash
-# Using uv
+# Using uv (recommended)
+uv pip install -e ".[dev]"
 uv run pytest
 
+# Run with coverage report
+uv run pytest --cov=herald --cov-report=term-missing
+
+# Run specific test file
+uv run pytest tests/test_app.py -v
+
+# Run with different verbosity
+uv run pytest -vv
+
 # Using pip
+pip install -e ".[dev]"
 pytest
 ```
+
+### Test Structure
+
+- **tests/conftest.py**: Shared fixtures and test configuration
+- **tests/test_cv_parser.py**: Tests for CV parsing modules
+- **tests/test_context_manager.py**: Tests for context management strategies
+- **tests/test_rag.py**: Tests for RAG vector store
+- **tests/test_app.py**: Tests for main application logic
+- **tests/test_main.py**: Tests for entry point and CLI
+- **tests/test_integration.py**: End-to-end integration tests
 
 ### Code Quality
 
