@@ -1,30 +1,40 @@
 """Application entry point for the herald package."""
 
+import os
 import uuid
 from agents import Agent, Runner, trace, gen_trace_id, SQLiteSession
 
-from herald.context import HeraldPrompter
-
-# import herald.response_handles as resp_handles
+from herald.context_manager.icontext import ContextInterface
 
 
 class HeraldApp:
     """Herald application."""
 
-    def __init__(self):
-        """Initialize the Herald application."""
+    def __init__(self, prompt: ContextInterface):
+        """Initialize the Herald application.
+
+        :param ContextInterface prompt: The context interface for the application,
+        which provides the necessary context for the agent to operate.
+        """
         self.uuid = uuid.uuid4()
         # ":memory:" for in-memory database, "herald_traces.db" for file-based persistence
         self.session = SQLiteSession(session_id=str(self.uuid), db_path="herald_traces.db")
+        self.prompt = prompt
 
     def herald_agent(self):
         """Heralder Agent for CV conversations"""
-        return Agent(
-            name="heralder",
-            instructions=HeraldPrompter.get_basic_system_instructions(),
-            model="gpt-5-nano",
-            # output_type=resp_handles.CVResponse
-        )
+
+        agent_options = {
+            "name": "heralder",
+            "instructions": self.prompt.get_system_instructions(),
+            "model": "gpt-5-nano",
+        }
+
+        # Add vector store retriever to the agent options if the prompt type is RAG based
+        if self.prompt.type == "rag_based":
+            agent_options["tools"] = [self.prompt.context_store.create_tool()]
+
+        return Agent(**agent_options)
 
     async def run(self, message: str, history: list):
         """
@@ -43,7 +53,7 @@ class HeraldApp:
         # create a trace path for current LLM run
         trace_id = gen_trace_id()
         with trace("Herald Trace", trace_id=trace_id):
-            yield f"Traces @ https://platform.openai.com/traces/trace?trace_id={trace_id}"
+            # yield f"Traces @ https://platform.openai.com/traces/trace?trace_id={trace_id}"
             print("Asking Herald!")
             result = await Runner.run(
                 self.herald_agent(), message, session=self.session  # for conversation history and traceability

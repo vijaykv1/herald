@@ -1,11 +1,20 @@
-"""File containing all the context classes for the herald package."""
+"""Context Interface for Herald."""
 
 import os
+import abc
 import pymupdf4llm
 
 
-class HeraldPrompter:
-    """Herald Prompt options."""
+class ContextInterface(abc.ABC):
+    """Context Interface for Herald."""
+
+    def __init__(self, cv_pdf_file: str = None):
+        """Initialize the Context Interface.
+
+        :param str cv_pdf_file: PDF file with CV content, optional
+        """
+        self._cv_pdf_file = cv_pdf_file
+        self._cv_md_content = self.prepare_cv_content(cv_pdf_file)
 
     @staticmethod
     def prepare_cv_content(cv_pdf_file: str = None) -> str:
@@ -27,33 +36,18 @@ class HeraldPrompter:
 
         return pymupdf4llm.to_markdown(cv_pdf_file)
 
-    @classmethod
-    def get_basic_system_instructions(cls) -> str:
-        """Get the System instructions for Heralder Agent.
+    def basic_system_instructions(self) -> str:
+        """Basic system instructions for the Agent.
 
-        This system instructions is rudimentary and works in the following way.
+        This is a basic system instruction which can be used as a
+        template for the CV Answering Agent.
 
-        1. First read the CV and prepare it in the markdown format
-        2. Prepare the system prompt for the Agent to efficiently answer the user's question.
-        3. Pass the CV content into the final prompt for clarity to Agent
-
-        :return: System prompt for Agent
+        :return: Basic system instructions for the Agent
         :rtype: str
         """
-
-        # read CV content
-        cv_content = cls.prepare_cv_content()
-
         # Get the name of the person from env variable, if not set then use a default name
         name = os.getenv("ME", "The Candidate")
-
-        return f"""# CV Assistant System Prompt
-
-    You are a helpful assistant that answers questions about {name}'s professional background and qualifications.
-
-    ## Your Knowledge Base
-
-    {cv_content}
+        return f"""You are a helpful assistant that answers questions about {name}'s professional background and qualifications.
 
     ## Instructions
 
@@ -88,16 +82,39 @@ class HeraldPrompter:
     A: [Provide degree(s), institution(s), graduation year(s), and any relevant honors/coursework mentioned]
 
     Q: "Are you familiar with cloud platforms?"
-    A: [List specific platforms mentioned, or state if none are listed]"""
+    A: [List specific platforms mentioned, or state if none are listed]
+        """
 
+    @abc.abstractmethod
+    def get_system_instructions(self) -> str:
+        """Get the System instructions for Heralder Agent.
 
-# if __name__ == '__main__':
+        .. note::
 
-#     import dotenv
+            The user query can be used to prepare more dynamic system instructions based on the user's question.
+            For example, if the user is asking about skills, then the system instructions can be prepared in a way that
+            it emphasizes the skills section of the CV more. This is mostly useful for RAG approaches.
 
-#     # load complete dotenv here
-#     dotenv.load_dotenv()
+        :return: System prompt for Agent
+        :rtype: str
+        """
+        pass
 
-#     p_cl = HeraldPrompter()
-#     prompt = p_cl.get_basic_system_instructions()
-#     print(prompt)
+    @property
+    @abc.abstractmethod
+    def type(self) -> str:
+        """Get the type of the Context Interface.
+
+        :return: Type of the Context Interface
+        :rtype: str
+        """
+        pass
+
+    @property
+    def cv_md_content(self) -> str:
+        """Get the CV content in markdown format.
+
+        :return: CV content in markdown format
+        :rtype: str
+        """
+        return self._cv_md_content
