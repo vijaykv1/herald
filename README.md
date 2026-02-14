@@ -18,17 +18,182 @@ professional background, skills, and experience based on your CV or LinkedIn pro
 
 ## 🏗️ Architecture
 
+### Class Diagram
+
+The following diagram shows the core classes and their relationships in the Herald system:
+
+```mermaid
+classDiagram
+    %% Main Application
+    class HeraldApp {
+        -UUID uuid
+        -SQLiteSession session
+        -ContextInterface prompt
+        +__init__(prompt: ContextInterface)
+        +herald_agent() Agent
+        +run(message: str, history: list) AsyncGenerator
+    }
+
+    %% Context Manager Interface and Implementations
+    class ContextInterface {
+        <<abstract>>
+        -str _cv_pdf_file
+        -str _cv_md_content
+        +__init__(cv_pdf_file: str)
+        +prepare_cv_content(cv_pdf_file: str)$ str
+        +basic_system_instructions() str
+        +get_system_instructions()* str
+        +type* str
+    }
+
+    class HeraldBasicPrompter {
+        +__init__(cv_pdf_file: str)
+        +type str
+        +get_system_instructions() str
+    }
+
+    class HeraldRAGContextManager {
+        -CVVectorStore vector_store
+        +__init__(cv_pdf_file: str)
+        +type str
+        +context_store CVVectorStore
+        +get_system_instructions() str
+        -__prepare_vector_store(cv_content: str)$ CVVectorStore
+    }
+
+    %% Vector Store for RAG
+    class CVVectorStore {
+        -list __cv_chunks
+        -OpenAI __client
+        -Collection __cv_collection
+        +__init__(cv_chunks: list, chromadb_local_path: str)
+        +vectorize_chunks() void
+        +retrieve_relevant_chunks(query: str, top_k: int) list
+        +create_tool() function_tool
+        -__normalize_chunk(chunk: dict)$ str
+    }
+
+    %% CV Parser Interface and Implementations
+    class CVParserInterface {
+        <<abstract>>
+        -str _cv
+        +__init__(cv: str)
+        +parse()* dict
+        +type* str
+        +parsed_cv* dict
+    }
+
+    class LinkedInCVParser {
+        -list __linkedin_cv_struct
+        -dict __topics
+        -dict _parsed_cv
+        +__init__(cv: str)
+        +type str
+        +parsed_cv dict
+        +parse() dict
+        -_parse_experience(content: str)$ dict
+    }
+
+    %% Relationships
+    HeraldApp --> ContextInterface : uses
+    ContextInterface <|-- HeraldBasicPrompter : implements
+    ContextInterface <|-- HeraldRAGContextManager : implements
+    HeraldRAGContextManager --> CVVectorStore : contains
+    CVParserInterface <|-- LinkedInCVParser : implements
+    HeraldRAGContextManager ..> LinkedInCVParser : uses
+    CVVectorStore ..> LinkedInCVParser : processes chunks from
+
+    %% External Dependencies (shown for context)
+    class Agent {
+        <<external>>
+    }
+    class Runner {
+        <<external>>
+    }
+    class OpenAI {
+        <<external>>
+    }
+    class ChromaDB {
+        <<external>>
+    }
+
+    HeraldApp ..> Agent : creates
+    HeraldApp ..> Runner : uses
+    CVVectorStore --> OpenAI : uses
+    CVVectorStore --> ChromaDB : uses
 ```
-herald/
-├── app.py                    # Main Herald application logic
-├── cv_parser/                # CV parsing modules
-│   ├── iparser.py           # Parser interface
-│   └── linkedin.py          # LinkedIn CV parser implementation
-└── context_manager/          # Context management strategies
-    ├── icontext.py          # Context interface
-    ├── prompt_based.py      # Basic prompt-based context
-    ├── rag_based.py         # RAG-based context with vector search
-    └── rag.py               # Vector store implementation using ChromaDB
+
+### Interaction Flow
+
+The following activity diagram illustrates how Herald processes user queries from start to finish:
+
+```mermaid
+flowchart TD
+    Start([User Starts Herald]) --> LoadEnv[Load Environment Variables]
+    LoadEnv --> CheckUI{WITH_BROWSER?}
+    
+    CheckUI -->|yes| BrowserUI[Launch Gradio UI]
+    CheckUI -->|no| TerminalUI[Launch Terminal UI]
+    
+    BrowserUI --> SelectPrompt{PROMPT_OPTION?}
+    TerminalUI --> SelectPrompt
+    
+    SelectPrompt -->|basic| BasicPrompt[Create HeraldBasicPrompter]
+    SelectPrompt -->|rag| RAGPrompt[Create HeraldRAGContextManager]
+    
+    BasicPrompt --> LoadCV[Load CV from PDF]
+    RAGPrompt --> LoadCV
+    
+    LoadCV --> ConvertCV[Convert PDF to Markdown<br/>using pymupdf4llm]
+    
+    ConvertCV --> PrepareContext{Context Type?}
+    
+    PrepareContext -->|basic| InjectCV[Inject Full CV<br/>into System Prompt]
+    PrepareContext -->|rag| ParseCV[Parse CV with<br/>LinkedInCVParser]
+    
+    ParseCV --> ChunkCV[Split CV into<br/>Semantic Chunks]
+    ChunkCV --> Vectorize[Create Embeddings<br/>with OpenAI API]
+    Vectorize --> StoreVector[Store in ChromaDB<br/>Vector Database]
+    
+    InjectCV --> CreateApp[Create HeraldApp Instance]
+    StoreVector --> CreateApp
+    
+    CreateApp --> WaitQuery[Wait for User Query]
+    
+    WaitQuery --> ProcessQuery{Query Received}
+    
+    ProcessQuery -->|exit/quit| Cleanup
+    ProcessQuery -->|question| CreateSession[Create/Reuse<br/>SQLite Session]
+    
+    CreateSession --> CreateTrace[Generate Trace ID]
+    CreateTrace --> CheckContextType{Context Type?}
+    
+    CheckContextType -->|basic| CreateAgent1[Create Agent with<br/>Full CV Context]
+    CheckContextType -->|rag| CreateAgent2[Create Agent with<br/>Retrieval Tool]
+    
+    CreateAgent1 --> RunAgent[Run Agent via Runner]
+    CreateAgent2 --> RAGRetrieval{Agent needs info?}
+    
+    RAGRetrieval --> QueryVector[Query Vector Store<br/>with Semantic Search]
+    QueryVector --> RetrieveChunks[Retrieve Top-K<br/>Relevant Chunks]
+    RetrieveChunks --> ProvideContext[Provide Context<br/>to Agent]
+    ProvideContext --> RunAgent
+    
+    RunAgent --> StreamResponse[Stream Response<br/>to User]
+    StreamResponse --> DisplayAnswer[Display Answer]
+    
+    DisplayAnswer --> WaitQuery
+    
+    Cleanup[Cleanup Trace Database] --> End([Application Ends])
+    
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style CreateAgent1 fill:#87CEEB
+    style CreateAgent2 fill:#87CEEB
+    style RAGRetrieval fill:#FFD700
+    style QueryVector fill:#FFD700
+    style InjectCV fill:#DDA0DD
+    style ParseCV fill:#DDA0DD
 ```
 
 ## 📋 Prerequisites
