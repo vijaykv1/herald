@@ -2,6 +2,8 @@
 
 import os
 from herald.context_manager.icontext import ContextInterface
+from herald.context_manager.rag import CVVectorStore
+from herald.cv_parser.linkedin import LinkedInCVParser
 
 
 class HeraldRAGContextManager(ContextInterface):
@@ -14,6 +16,9 @@ class HeraldRAGContextManager(ContextInterface):
         """
         super().__init__(cv_pdf_file=cv_pdf_file)
 
+        # prepare the vector store for RAG based context management
+        self.vector_store = self.__prepare_vector_store(cv_content=self._cv_md_content)
+
     @property
     def type(self) -> str:
         """Get the type of the Context Interface.
@@ -22,6 +27,15 @@ class HeraldRAGContextManager(ContextInterface):
         :rtype: str
         """
         return "rag_based"
+
+    @property
+    def context_store(self):
+        """Get the context store for RAG based context management.
+
+        :return: The vector store instance for RAG based context management
+        :rtype: CVVectorStore
+        """
+        return self.vector_store
 
     def get_system_instructions(self) -> str:
         """Get the System instructions for Heralder Agent (With tool usage).
@@ -75,3 +89,27 @@ User: "What's your educational background?"
 1. Call `retrieve_relevant_chunks(query="education degree university")`
 2. Answer based on retrieved chunks with degrees, institutions, and years
     """  # This needs working to include facts about the tool to use
+
+    @staticmethod
+    def __prepare_vector_store(cv_content: str) -> CVVectorStore:
+        """Prepare the vector store for RAG based context management.
+
+        :param str cv_content: The raw CV content to be processed and stored in the vector store.
+        :return: An instance of the CVVectorStore with the processed CV data
+        :rtype: CVVectorStore
+        """
+        # Get the CV type from the environment variable
+        cv_type = os.getenv("CV_TYPE", "linkedin")
+
+        if cv_type != "linkedin":
+            raise ValueError(f"Unsupported CV type: {cv_type}")
+        cv_parser = LinkedInCVParser(cv=cv_content)
+
+        # perform parse to get the chunked data ready for vector store creation
+        cv_chunks = cv_parser.parse()
+        vector_store = CVVectorStore(cv_chunks=cv_chunks)  # type: ignore
+
+        # prepare the vector store for current session
+        vector_store.vectorize_chunks()
+
+        return vector_store

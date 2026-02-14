@@ -3,6 +3,7 @@
 This module implements a context manager that retrieves relevant information to embeddings.
 """
 
+import tqdm
 import chromadb
 from openai import OpenAI
 from agents.tool import function_tool
@@ -31,15 +32,18 @@ class CVVectorStore:
             content = chunk["content"]
         else:  # dict
             content = "\n".join([f"{k}: {v}" for k, v in chunk["content"].items()])
-        return f"""
+
+        norm_chunk = f"""
 ### CV Section: {topic}
 
 {content}
 """.strip()
+        # print(f"Normalized chunk:\n{norm_chunk}\n")
+        return norm_chunk
 
     def vectorize_chunks(self):
         """Vectorize the CV chunks and store them in the vector store."""
-        for idx, chunk in enumerate(self.__cv_chunks):
+        for idx, chunk in enumerate(tqdm.tqdm(self.__cv_chunks, desc="Vectorizing CV chunks", colour="green")):
             # normalize the chunk text
             normalized_text = self.__normalize_chunk(chunk)
 
@@ -83,9 +87,10 @@ class CVVectorStore:
         docs = results.get("documents", [])  # get the documents from the results, default to empty list if not found
 
         return docs[0] if docs else []
-    
+
     def create_tool(self):
         """Create a tool wrapper for the retrieve_relevant_chunks method."""
+
         @function_tool
         def retrieve_relevant_chunks(query: str, top_k: int = 4) -> list:
             """
@@ -99,5 +104,5 @@ class CVVectorStore:
                 A list of relevant CV chunk texts.
             """
             return self.retrieve_relevant_chunks(query, top_k)
-        
+
         return retrieve_relevant_chunks

@@ -126,7 +126,7 @@ class LinkedInCVParser(CVParserInterface):
                 # location = lines[i+1]
                 description_info = []
                 i += 1  # lets move the pointer to the next line after the location line
-                print("----> Found a job line: ", company_info)
+                # print("----> Found a job line: ", company_info)
                 while i < len(lines) and not job_pattern.match(lines[i]):
                     description_info.append(lines[i])
                     i += 1

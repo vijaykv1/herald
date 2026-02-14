@@ -5,9 +5,6 @@ import uuid
 from agents import Agent, Runner, trace, gen_trace_id, SQLiteSession
 
 from herald.context_manager.icontext import ContextInterface
-from herald.context_manager.rag import CVVectorStore
-
-from herald.cv_parser.linkedin import LinkedInCVParser
 
 
 class HeraldApp:
@@ -24,20 +21,6 @@ class HeraldApp:
         self.session = SQLiteSession(session_id=str(self.uuid), db_path="herald_traces.db")
         self.prompt = prompt
 
-        # initialize the vector store if the prompt type is RAG based
-        self.vector_store = None
-        if self.prompt.type == "rag_based":
-            cv_type = os.getenv("CV_TYPE", "linkedin")
-
-            if cv_type == "linkedin":
-                cv_parser = LinkedInCVParser(cv=self.prompt.cv_md_content)
-            else:
-                raise ValueError(f"Unsupported CV type: {cv_type}")
-
-            # perform parse to get the chunked data ready for vector store creation
-            cv_chunks = cv_parser.parse()
-            self.vector_store = CVVectorStore(cv_chunks=cv_chunks)  # type: ignore
-
     def herald_agent(self):
         """Heralder Agent for CV conversations"""
 
@@ -49,7 +32,7 @@ class HeraldApp:
 
         # Add vector store retriever to the agent options if the prompt type is RAG based
         if self.prompt.type == "rag_based":
-            agent_options["tools"] = [self.vector_store.create_tool()]
+            agent_options["tools"] = [self.prompt.context_store.create_tool()]
 
         return Agent(**agent_options)
 
@@ -70,7 +53,7 @@ class HeraldApp:
         # create a trace path for current LLM run
         trace_id = gen_trace_id()
         with trace("Herald Trace", trace_id=trace_id):
-            yield f"Traces @ https://platform.openai.com/traces/trace?trace_id={trace_id}"
+            # yield f"Traces @ https://platform.openai.com/traces/trace?trace_id={trace_id}"
             print("Asking Herald!")
             result = await Runner.run(
                 self.herald_agent(), message, session=self.session  # for conversation history and traceability
