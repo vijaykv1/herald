@@ -1,7 +1,5 @@
 """File containing all the context classes for the herald package."""
 
-import os
-
 from herald.context_manager.icontext import ContextInterface
 
 
@@ -24,7 +22,7 @@ class HeraldBasicPrompter(ContextInterface):
         """
         return "basic_prompt"
 
-    def get_system_instructions(self, user_query: str = None) -> str:
+    def get_system_instructions(self) -> str:
         """Get the System instructions for Heralder Agent.
 
         This system instructions is rudimentary and works in the following way.
@@ -33,7 +31,6 @@ class HeraldBasicPrompter(ContextInterface):
         2. Prepare the system prompt for the Agent to efficiently answer the user's question.
         3. Pass the CV content into the final prompt for clarity to Agent
 
-        :param str user_query: The user query for which the system instructions is being prepared, not used here
         :return: System prompt for Agent
         :rtype: str
         """

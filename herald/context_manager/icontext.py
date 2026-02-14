@@ -47,6 +47,7 @@ class ContextInterface(abc.ABC):
         """
         # Get the name of the person from env variable, if not set then use a default name
         name = os.getenv("ME", "The Candidate")
+        # pylint: disable=line-too-long
         return f"""You are a helpful assistant that answers questions about {name}'s professional background and qualifications.
 
     ## Instructions
@@ -98,7 +99,6 @@ class ContextInterface(abc.ABC):
         :return: System prompt for Agent
         :rtype: str
         """
-        pass
 
     @property
     @abc.abstractmethod
@@ -108,7 +108,6 @@ class ContextInterface(abc.ABC):
         :return: Type of the Context Interface
         :rtype: str
         """
-        pass
 
     @property
     def cv_md_content(self) -> str:

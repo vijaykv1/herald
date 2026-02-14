@@ -31,16 +31,13 @@ class CVParserInterface(abc.ABC):
         :return: Parsed CV data as a dictionary
         :rtype: dict
         """
-        pass
 
     @property
     @abc.abstractmethod
     def type(self) -> str:
         """Return the type of CV this parser handles."""
-        pass
 
     @property
     @abc.abstractmethod
     def parsed_cv(self) -> dict:
         """Return the parsed CV data."""
-        pass

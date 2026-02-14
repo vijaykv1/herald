@@ -15,3 +15,9 @@ dependencies = [
     "rich>=14.3.2",
     "tqdm>=4.67.3",
 ]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint."messages control"]
+disable = ["fixme"]
