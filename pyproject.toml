@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
     "chromadb>=1.5.0",
     "dotenv>=0.9.9",
+    "fastapi>=0.128.4",
     "gradio>=6.5.1",
     "langchain-text-splitters>=1.1.0",
     "openai-agents>=0.8.1",
@@ -41,3 +42,6 @@ disable = ["fixme"]
 where = ["."]
 include = ["herald*"]
 exclude = ["tests*", "data*"]
+
+[tool.uv]
+constraint-dependencies = ["onnxruntime<=1.19.2"]

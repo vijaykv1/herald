@@ -364,6 +364,62 @@ Key dependencies include:
 
 See `pyproject.toml` for the complete list.
 
+## 🗺️ Roadmap / TODO
+
+### REST API for Portfolio Integration
+
+The [portfolio Ask Me! page](https://github.com/vijaykv1/portfolio) connects to Herald via a FastAPI backend.
+The following endpoint needs to be implemented:
+
+**`api.py`** (new file — add FastAPI alongside the existing Gradio/terminal entry points):
+
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from herald.app import HeraldApp
+from herald.context_manager.prompt_based import HeraldBasicPrompter
+# from herald.context_manager.rag_based import HeraldRAGContextManager
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # tighten to your portfolio domain in production
+    allow_methods=["POST"],
+    allow_headers=["*"],
+)
+
+prompt_type = HeraldBasicPrompter()   # or HeraldRAGContextManager()
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str
+
+@app.post("/chat")
+async def chat(body: ChatRequest):
+    response = ""
+    async for chunk in HeraldApp(prompt=prompt_type).run(body.message, history=[]):
+        response = chunk
+    return {"response": response}
+```
+
+Run with:
+```bash
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+Then set `NEXT_PUBLIC_HERALD_API_URL=http://localhost:8000` in the portfolio's `.env.local`.
+
+**Checklist:**
+- [ ] Add `fastapi` and `uvicorn` to `pyproject.toml` dependencies
+- [ ] Create `api.py` with the endpoint above
+- [ ] Add CORS origin restriction for production deployment
+- [ ] Consider session-level `HeraldApp` reuse (currently creates a new instance per request)
+- [ ] Optional: add `GET /health` for uptime checks from the portfolio UI
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
