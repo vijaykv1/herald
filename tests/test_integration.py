@@ -90,9 +90,10 @@ class TestIntegration:
             
             # Run query
             results = []
+            mock_session_instance = MagicMock()
             async for chunk in app.run(
                 message="How many years of Python experience do you have?",
-                history=[]
+                session=mock_session_instance
             ):
                 results.append(chunk)
             

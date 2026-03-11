@@ -151,6 +151,49 @@ San Francisco, CA
         parser = LinkedInCVParser(sample_linkedin_cv)
         result1 = parser.parse()
         result2 = parser.parse()
-        
+
         # Results should be consistent
         assert len(result1) == len(result2)
+
+    def test_parse_misc_topics_recognized(self):
+        """Test that recognized ### topics (e.g. Skills) are added as misc_topics chunks."""
+        cv_content = """# John Doe
+
+### Skills
+Python, Java, AWS
+
+### Languages
+English, German
+"""
+        parser = LinkedInCVParser(cv_content)
+        result = parser.parse()
+
+        topics = [chunk["topic"] for chunk in result]
+        assert "Skills" in topics or "Languages" in topics
+
+    def test_parse_name_only_section(self):
+        """Test that a top-level # section with no sub-headers produces name/overall_description chunks."""
+        cv_content = """# Jane Smith
+
+Experienced engineer with a passion for distributed systems.
+"""
+        parser = LinkedInCVParser(cv_content)
+        result = parser.parse()
+
+        topics = [chunk["topic"] for chunk in result]
+        assert "name" in topics or "overall_description" in topics
+
+    def test_parse_miscellaneous_section(self):
+        """Test that content before any header is captured as miscellaneous."""
+        cv_content = """Some preamble text without any header.
+
+# John Doe
+
+## Experience
+Work stuff
+"""
+        parser = LinkedInCVParser(cv_content)
+        result = parser.parse()
+
+        topics = [chunk["topic"] for chunk in result]
+        assert "miscellaneous" in topics
