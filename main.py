@@ -2,8 +2,13 @@
 
 import os
 import asyncio
+from contextlib import asynccontextmanager
+
 import dotenv
 import gradio as gr
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from rich.console import Console
 from rich.panel import Panel
@@ -12,8 +17,18 @@ from rich.prompt import Prompt
 from herald.app import HeraldApp
 from herald.context_manager.prompt_based import HeraldBasicPrompter
 from herald.context_manager.rag_based import HeraldRAGContextManager
+from herald.herald_route import herald_router
 
 dotenv.load_dotenv()
+
+
+def cleanup_traces_db():
+    """Clean up traces database after the run."""
+    print("Cleaning up traces database...")
+    for fname in ["herald_traces.db", "herald_traces.db-shm", "herald_traces.db-wal"]:
+        if os.path.exists(fname):
+            print(f"Cleaning up {fname}...")
+            os.remove(fname)
 
 
 async def terminal_ui(prompt):
@@ -42,6 +57,27 @@ async def terminal_ui(prompt):
         console.print()
 
 
+@asynccontextmanager
+async def lifespan_context(app: FastAPI):  # pylint: disable=unused-argument
+    """Lifespan context manager for FastAPI application.
+    
+    :param FastAPI app: FastAPI application instance
+    """
+    yield
+    cleanup_traces_db()
+
+
+herald_app = FastAPI(lifespan=lifespan_context)
+
+herald_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # tighten later
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+herald_app.include_router(herald_router)
+
 if __name__ == "__main__":
 
     try:
@@ -64,8 +100,4 @@ if __name__ == "__main__":
             asyncio.run(terminal_ui(prompt=prompt_type))
 
     finally:  # clean up workspace by removing the traces db after the run
-        print("Cleaning up traces database...")
-        for fname in ["herald_traces.db", "herald_traces.db-shm", "herald_traces.db-wal"]:
-            if os.path.exists(fname):
-                print(f"Cleaning up {fname}...")
-                os.remove(fname)
+        cleanup_traces_db()
