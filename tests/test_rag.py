@@ -173,13 +173,42 @@ class TestCVVectorStore:
         mock_collection = MagicMock()
         mock_client.create_collection.return_value = mock_collection
         mock_chromadb.return_value = mock_client
-        
+
         mock_tool = MagicMock()
         mock_function_tool.return_value = mock_tool
-        
+
         vector_store = CVVectorStore(sample_cv_chunks)
         tool = vector_store.create_tool()
-        
+
         # Verify function_tool was called
         mock_function_tool.assert_called_once()
         assert tool == mock_tool
+
+    @patch('herald.context_manager.rag.chromadb.Client')
+    @patch('herald.context_manager.rag.OpenAI')
+    def test_create_tool_inner_function_delegates(self, mock_openai, mock_chromadb, sample_cv_chunks):
+        """Test that calling the inner tool function delegates to retrieve_relevant_chunks."""
+        mock_client = MagicMock()
+        mock_collection = MagicMock()
+        mock_client.create_collection.return_value = mock_collection
+        mock_chromadb.return_value = mock_client
+
+        mock_openai_instance = MagicMock()
+        mock_embedding = MagicMock()
+        mock_embedding.data = [MagicMock(embedding=[0.1] * 1536)]
+        mock_openai_instance.embeddings.create.return_value = mock_embedding
+        mock_openai.return_value = mock_openai_instance
+
+        mock_collection.query.return_value = {
+            'documents': [['Relevant chunk']],
+            'distances': [[0.1]],
+            'metadatas': [[{'topic': 'Skills'}]],
+        }
+
+        # Use function_tool as identity so the inner fn is directly callable
+        with patch('herald.context_manager.rag.function_tool', side_effect=lambda f: f):
+            vector_store = CVVectorStore(sample_cv_chunks)
+            inner_fn = vector_store.create_tool()
+            result = inner_fn(query="Python skills", top_k=1)
+
+        assert result == ['Relevant chunk']

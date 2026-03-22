@@ -180,13 +180,39 @@ class TestHeraldRAGContextManager:
         """Test that vector store is prepared during initialization."""
         mock_exists.return_value = True
         mock_to_markdown.return_value = sample_cv_content
-        
+
         # Setup mock parser
         mock_parser_instance = MagicMock()
         mock_parser_instance.parse.return_value = []
         mock_parser.return_value = mock_parser_instance
-        
+
         rag_manager = HeraldRAGContextManager("test.pdf")
-        
+
         # Vector store should be created
         assert rag_manager.vector_store is not None
+
+    @patch('herald.context_manager.rag_based.CVVectorStore')
+    @patch('herald.context_manager.icontext.pymupdf4llm.to_markdown')
+    @patch('os.path.exists')
+    @patch.dict(os.environ, {'CV_TYPE': 'pdf'})
+    def test_unsupported_cv_type_raises(self, mock_exists, mock_to_markdown, mock_vector_store, sample_cv_content):
+        """Test that an unsupported CV_TYPE env var raises ValueError."""
+        mock_exists.return_value = True
+        mock_to_markdown.return_value = sample_cv_content
+
+        with pytest.raises(ValueError, match="Unsupported CV type"):
+            HeraldRAGContextManager("test.pdf")
+
+
+class TestCvMdContentProperty:
+    """Tests for the cv_md_content property on ContextInterface subclasses."""
+
+    @patch('herald.context_manager.icontext.pymupdf4llm.to_markdown')
+    @patch('os.path.exists')
+    def test_cv_md_content_property(self, mock_exists, mock_to_markdown, sample_cv_content):
+        """Test that cv_md_content returns the stored markdown content."""
+        mock_exists.return_value = True
+        mock_to_markdown.return_value = sample_cv_content
+
+        prompter = HeraldBasicPrompter("test.pdf")
+        assert prompter.cv_md_content == sample_cv_content

@@ -70,10 +70,10 @@ class LinkedInCVParser(CVParserInterface):
                     # elif topic == "Education": # Education section is a special case, we will handle it separately
                     #     education_content = self.__parse_education(section.page_content)
                     #     chunks.extend(education_content)
-            elif "name" in metadata:  # Just in case its just the name then, we have a special case for it
-                name = metadata["name"]
-                chunks.append({"topic": "name", "content": name})
-                chunks.append({"topic": "overall_description", "content": section.page_content})
+                else:  # Just the name section without any main topics
+                    name = metadata["name"]
+                    chunks.append({"topic": "name", "content": name})
+                    chunks.append({"topic": "overall_description", "content": section.page_content})
             else:  # All other unspecified sections can be added to a miscellaneous topic
                 chunks.append({"topic": "miscellaneous", "content": section.page_content})
 

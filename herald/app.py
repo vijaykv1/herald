@@ -1,6 +1,5 @@
 """Application entry point for the herald package."""
 
-import uuid
 from agents import Agent, Runner, trace, gen_trace_id, SQLiteSession
 
 from herald.context_manager.icontext import ContextInterface
@@ -15,9 +14,6 @@ class HeraldApp:
         :param ContextInterface prompt: The context interface for the application,
         which provides the necessary context for the agent to operate.
         """
-        self.uuid = uuid.uuid4()
-        # ":memory:" for in-memory database, "herald_traces.db" for file-based persistence
-        self.session = SQLiteSession(session_id=str(self.uuid), db_path="herald_traces.db")
         self.prompt = prompt
 
     def herald_agent(self):
@@ -35,27 +31,19 @@ class HeraldApp:
 
         return Agent(**agent_options)
 
-    async def run(self, message: str, history: list):  # pylint: disable=unused-argument
+    async def run(self, message: str, session: SQLiteSession):
         """
-        Run query on the CV provided
-
-        .. note::
-            The message is the user query for the CV and the history is the conversation history for the
-            current session. The history is used to provide context to the agent for better responses.
-            But then the context provided in the system prompt is already quite comprehensive, so the history might
-            not be that useful in this case. We can experiment with it in future iterations.
+        Run query on the CV provided, maintaining conversation history via the given session.
 
         :param message: Message provided by the user
-        :type message: str
+        :param session: Per-user SQLiteSession that stores conversation history
         """
-        print(f"Session ID: {self.session.session_id}")
-        # create a trace path for current LLM run
+        print(f"Session ID: {session.session_id}")
         trace_id = gen_trace_id()
         with trace("Herald Trace", trace_id=trace_id):
-            # yield f"Traces @ https://platform.openai.com/traces/trace?trace_id={trace_id}"
             print("Asking Herald!")
             result = await Runner.run(
-                self.herald_agent(), message, session=self.session  # for conversation history and traceability
+                self.herald_agent(), message, session=session
             )
             yield result.final_output
 
