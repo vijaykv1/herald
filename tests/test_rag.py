@@ -25,18 +25,17 @@ class TestCVVectorStore:
 
     @patch('herald.context_manager.rag.chromadb.Client')
     @patch('herald.context_manager.rag.OpenAI')
-    def test_init_custom_path(self, mock_openai, mock_chromadb, sample_cv_chunks):
-        """Test initialization with custom ChromaDB path."""
+    def test_init_uses_in_memory_client(self, mock_openai, mock_chromadb, sample_cv_chunks):
+        """CVVectorStore uses an in-memory ChromaDB client (no persist_directory)."""
         mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_client.create_collection.return_value = mock_collection
         mock_chromadb.return_value = mock_client
-        
-        custom_path = "./custom_vector_store"
-        vector_store = CVVectorStore(sample_cv_chunks, chromadb_local_path=custom_path)
-        
-        # Verify chromadb was initialized with custom path
-        assert mock_chromadb.called
+
+        CVVectorStore(sample_cv_chunks)
+
+        # Client must be called with no arguments (in-memory mode)
+        mock_chromadb.assert_called_once_with()
 
     def test_normalize_chunk_string_content(self):
         """Test chunk normalization with string content."""
