@@ -17,11 +17,33 @@ class TestContextInterface:
         """Test preparing CV content from PDF file."""
         mock_exists.return_value = True
         mock_to_markdown.return_value = sample_cv_content
-        
+
         result = ContextInterface.prepare_cv_content("test.pdf")
-        
+
         assert result == sample_cv_content
         mock_to_markdown.assert_called_once_with("test.pdf")
+
+    @patch('herald.context_manager.icontext.pymupdf4llm.to_markdown')
+    @patch('herald.context_manager.icontext.fitz.open')
+    @patch('herald.context_manager.icontext.download_cv_bytes')
+    @patch.dict('os.environ', {}, clear=False)
+    def test_prepare_cv_content_from_r2(self, mock_download, mock_fitz_open, mock_to_markdown, sample_cv_content):
+        """When CV_PATH is absent, CV is downloaded from R2 and converted from bytes."""
+        import os
+        os.environ.pop('CV_PATH', None)  # ensure CV_PATH is not set for this test
+
+        fake_pdf_bytes = b"%PDF-1.4 fake"
+        mock_download.return_value = fake_pdf_bytes
+        mock_doc = MagicMock()
+        mock_fitz_open.return_value = mock_doc
+        mock_to_markdown.return_value = sample_cv_content
+
+        result = ContextInterface.prepare_cv_content()
+
+        mock_download.assert_called_once()
+        mock_fitz_open.assert_called_once_with(stream=fake_pdf_bytes, filetype="pdf")
+        mock_to_markdown.assert_called_once_with(mock_doc)
+        assert result == sample_cv_content
 
     @patch('os.path.exists')
     def test_prepare_cv_content_file_not_exists(self, mock_exists):

@@ -2,7 +2,10 @@
 
 import os
 import abc
+import fitz  # PyMuPDF
 import pymupdf4llm
+
+from herald.storage.r2 import download_cv_bytes
 
 
 class ContextInterface(abc.ABC):
@@ -18,23 +21,32 @@ class ContextInterface(abc.ABC):
 
     @staticmethod
     def prepare_cv_content(cv_pdf_file: str = None) -> str:
-        """Prepare CV pdf content for the prompt.
+        """Prepare CV content as markdown, loading from local file or Cloudflare R2.
 
-        .. note::
-            CV file can be loaded via Environment var ``CV_PATH``
+        Resolution order:
+        1. ``cv_pdf_file`` argument, if provided.
+        2. ``CV_PATH`` environment variable, if set — local file mode.
+        3. Cloudflare R2 — cloud mode (requires R2_* env vars).
 
-        :param str cv_pdf_file: PDF file with CV content, optional
-        :return: CV content string
+        :param str cv_pdf_file: Path to a local PDF file, optional.
+        :return: CV content in markdown format.
         :rtype: str
+        :raises ValueError: If no valid CV source is configured.
         """
-        # if cv_pdf_file is not set, then an attempt is made to read from the env variables
+        # Resolve local path from argument or CV_PATH env var
         if cv_pdf_file is None:
             cv_pdf_file = os.getenv("CV_PATH")
 
-        if not os.path.exists(cv_pdf_file) or cv_pdf_file is None:
-            raise ValueError(f"The CV pdf {cv_pdf_file} does not exist! Please provide a valid one.")
+        if cv_pdf_file is not None:
+            # ── Local file mode ──────────────────────────────────────────────
+            if not os.path.exists(cv_pdf_file):
+                raise ValueError(f"The CV pdf '{cv_pdf_file}' does not exist! Please provide a valid one.")
+            return pymupdf4llm.to_markdown(cv_pdf_file)
 
-        return pymupdf4llm.to_markdown(cv_pdf_file)
+        # ── Cloud mode: download from Cloudflare R2 ──────────────────────────
+        pdf_bytes = download_cv_bytes()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        return pymupdf4llm.to_markdown(doc)
 
     def basic_system_instructions(self) -> str:
         """Basic system instructions for the Agent.

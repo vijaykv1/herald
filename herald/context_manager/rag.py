@@ -12,17 +12,17 @@ from agents.tool import function_tool
 class CVVectorStore:
     """A simple vector store implementation for storing and retrieving CV information."""
 
-    def __init__(self, cv_chunks: list, chromadb_local_path: str = "./cv_vector_store"):
+    def __init__(self, cv_chunks: list):
         """Initialize the vector store.
 
         :param list cv_chunks: The chunked CV data to be stored in the vector store.
         """
         self.__cv_chunks = cv_chunks
         self.__client = OpenAI()
-        # create a embeddings collection in chromadb for storing the CV chunks
-        self.__cv_collection = chromadb.Client(
-            settings=chromadb.config.Settings(persist_directory=chromadb_local_path)
-        ).create_collection(name="cv_lookup")
+        # In-memory ChromaDB collection — rebuilt on every startup.
+        # The CV is small enough that re-embedding takes only a few seconds and
+        # avoids any dependency on a persistent filesystem (required for Railway).
+        self.__cv_collection = chromadb.Client().create_collection(name="cv_lookup")
 
     def __normalize_chunk(self, chunk: dict) -> str:
         """Normalize the text for better retrieval."""
