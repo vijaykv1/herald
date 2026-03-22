@@ -15,7 +15,6 @@ import logging
 import os
 
 import boto3
-from botocore.exceptions import ClientError  #pylint: disable=import-error
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,6 @@ def download_cv_bytes() -> bytes:
     """Download the CV PDF from Cloudflare R2 and return its raw bytes.
 
     :raises ValueError: If R2_BUCKET_NAME is not set or credentials are missing.
-    :raises ClientError: If the download from R2 fails (e.g. object not found).
     :return: PDF file contents as bytes
     :rtype: bytes
     """
