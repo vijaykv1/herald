@@ -43,7 +43,7 @@ class TestHeraldApp:
         call_kwargs = mock_agent.call_args[1]
         assert call_kwargs['name'] == "heralder"
         assert call_kwargs['instructions'] == "Test instructions"
-        assert call_kwargs['model'] == "gpt-5-nano"
+        assert call_kwargs['model'] == "gemini-2.0-flash"
         assert 'tools' not in call_kwargs
 
     @patch('herald.app.Agent')
