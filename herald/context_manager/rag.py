@@ -3,10 +3,14 @@
 This module implements a context manager that retrieves relevant information to embeddings.
 """
 
+import os
 import tqdm
 import chromadb
 from openai import OpenAI
 from agents.tool import function_tool
+
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_EMBEDDING_MODEL = "text-embedding-004"
 
 
 class CVVectorStore:
@@ -18,7 +22,10 @@ class CVVectorStore:
         :param list cv_chunks: The chunked CV data to be stored in the vector store.
         """
         self.__cv_chunks = cv_chunks
-        self.__client = OpenAI()
+        self.__client = OpenAI(
+            api_key=os.environ["GEMINI_API_KEY"],
+            base_url=_GEMINI_BASE_URL,
+        )
         # In-memory ChromaDB collection — rebuilt on every startup.
         # The CV is small enough that re-embedding takes only a few seconds and
         # avoids any dependency on a persistent filesystem (required for Railway).
@@ -49,7 +56,7 @@ class CVVectorStore:
 
             # TODO: clean the text if needed (e.g., remove extra whitespace, special characters, etc.)
             # Create embeddings of the current chunk using OpenAI embeddings API
-            embedding = self.__client.embeddings.create(input=normalized_text, model="text-embedding-3-small")
+            embedding = self.__client.embeddings.create(input=normalized_text, model=_EMBEDDING_MODEL)
 
             # extract the embedding vector from the response
             embedding_vector = embedding.data[0].embedding
@@ -72,7 +79,7 @@ class CVVectorStore:
         :rtype: list
         """
         # create a embedding for the query
-        query_embedding = self.__client.embeddings.create(input=query, model="text-embedding-3-small")
+        query_embedding = self.__client.embeddings.create(input=query, model=_EMBEDDING_MODEL)
 
         # extract the embedding vector from the response
         query_embedding_vector = query_embedding.data[0].embedding
