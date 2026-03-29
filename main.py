@@ -68,8 +68,6 @@ async def lifespan_context(app: FastAPI):  # pylint: disable=unused-argument
     :param FastAPI app: FastAPI application instance
     """
     print("Building the application context...")
-    print(f"TOKEN_CTRL_ENABLED raw value: {os.getenv('TOKEN_CTRL_ENABLED')!r}")
-    print(f"TOKEN_CTRL_ENABLED parsed: {os.getenv('TOKEN_CTRL_ENABLED', 'false').lower() == 'true'}")
     app.state.herald_prompt = HeraldRAGContextManager()  # or use HeraldBasicPrompter()
     app.state.herald_app = HeraldApp(prompt=app.state.herald_prompt)
     app.state.session_store = {}  # session_id → (SQLiteSession, last_active_monotonic)
