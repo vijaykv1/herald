@@ -22,7 +22,7 @@ class HeraldApp:
         agent_options = {
             "name": "heralder",
             "instructions": self.prompt.get_system_instructions(),
-            "model": "gemini-2.0-flash",
+            "model": "gpt-5-nano",
         }
 
         # Add vector store retriever to the agent options if the prompt type is RAG based

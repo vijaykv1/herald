@@ -6,8 +6,7 @@ from contextlib import asynccontextmanager
 
 import dotenv
 import gradio as gr
-from agents import SQLiteSession, set_default_openai_client
-from openai import AsyncOpenAI
+from agents import SQLiteSession
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,11 +22,6 @@ from herald.herald_route import herald_router, HERALD_DB_PATH
 from herald.usage_tracker import UsageTracker
 
 dotenv.load_dotenv()
-
-set_default_openai_client(AsyncOpenAI(
-    api_key=os.environ["GEMINI_API_KEY"],
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-))
 
 
 def cleanup_traces_db():
