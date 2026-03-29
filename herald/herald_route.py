@@ -106,7 +106,7 @@ async def ask_api(
 ) -> dict:
     """API endpoint to handle chat requests."""
     # Enforce daily quota before spending any tokens
-    used, remaining = usage_tracker.check_quota(x_user_id)
+    used, _ = usage_tracker.check_quota(x_user_id)
 
     logger.info(
         "Processing chat request [user=%s, session=%s, usage=%d/%d]: %s",
