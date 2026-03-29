@@ -1,13 +1,11 @@
 """Per-user daily message quota tracking."""
 
-import os
 import sqlite3
 from datetime import datetime, timezone
 from fastapi import HTTPException
 
 USAGE_DB_PATH = "herald_usage.db"
 DAILY_MESSAGE_LIMIT = 10
-TOKEN_CTRL_ENABLED = os.getenv("TOKEN_CTRL_ENABLED", "false").lower() == "true"
 
 
 class UsageTracker:
@@ -44,8 +42,6 @@ class UsageTracker:
 
     def increment(self, user_id: str) -> int:
         """Increment today's count and return the new value."""
-        if not TOKEN_CTRL_ENABLED:
-            return 0
         today = self._today()
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
@@ -63,8 +59,6 @@ class UsageTracker:
 
     def check_quota(self, user_id: str) -> tuple[int, int]:
         """Return (used, remaining). Raise HTTP 429 if the daily limit is reached."""
-        if not TOKEN_CTRL_ENABLED:
-            return 0, DAILY_MESSAGE_LIMIT
         used = self.get_count(user_id)
         remaining = max(0, DAILY_MESSAGE_LIMIT - used)
         if used >= DAILY_MESSAGE_LIMIT:
