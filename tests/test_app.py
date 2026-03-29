@@ -2,7 +2,8 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from herald.app import HeraldApp
+from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
+from herald.app import HeraldApp, _GROQ_MODEL
 from herald.context_manager.prompt_based import HeraldBasicPrompter
 from herald.context_manager.rag_based import HeraldRAGContextManager
 
@@ -29,9 +30,14 @@ class TestHeraldApp:
 
         assert app.prompt == mock_prompt
 
+    @patch('herald.app._build_groq_model')
     @patch('herald.app.Agent')
-    def test_herald_agent_basic(self, mock_agent):
+    def test_herald_agent_basic(self, mock_agent, mock_build_model):
         """Test herald_agent creation with basic prompt."""
+        mock_model = MagicMock(spec=OpenAIChatCompletionsModel)
+        mock_model.model = _GROQ_MODEL
+        mock_build_model.return_value = mock_model
+
         mock_prompt = MagicMock()
         mock_prompt.type = "basic_prompt"
         mock_prompt.get_system_instructions.return_value = "Test instructions"
@@ -43,12 +49,15 @@ class TestHeraldApp:
         call_kwargs = mock_agent.call_args[1]
         assert call_kwargs['name'] == "heralder"
         assert call_kwargs['instructions'] == "Test instructions"
-        assert call_kwargs['model'] == "gpt-5-nano"
+        assert call_kwargs['model'] == mock_model
         assert 'tools' not in call_kwargs
 
+    @patch('herald.app._build_groq_model')
     @patch('herald.app.Agent')
-    def test_herald_agent_rag(self, mock_agent):
+    def test_herald_agent_rag(self, mock_agent, mock_build_model):
         """Test herald_agent creation with RAG prompt includes tools."""
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
+
         mock_tools = [MagicMock(), MagicMock()]
         mock_context_store = MagicMock()
         mock_context_store.create_tools.return_value = mock_tools
@@ -66,17 +75,13 @@ class TestHeraldApp:
         assert 'tools' in call_kwargs
         assert call_kwargs['tools'] == mock_tools
 
+    @patch('herald.app._build_groq_model')
     @patch('herald.app.Runner')
     @patch('herald.app.Agent')
-    @patch('herald.app.trace')
-    @patch('herald.app.gen_trace_id')
     @pytest.mark.asyncio
-    async def test_run_success(self, mock_gen_trace_id, mock_trace, mock_agent, mock_runner):
+    async def test_run_success(self, mock_agent, mock_runner, mock_build_model):
         """Test successful run of query with a session."""
-        mock_gen_trace_id.return_value = "test_trace_id"
-        mock_trace.return_value.__enter__ = MagicMock()
-        mock_trace.return_value.__exit__ = MagicMock()
-
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
         mock_prompt = MagicMock()
         mock_prompt.type = "basic_prompt"
         mock_prompt.get_system_instructions.return_value = "Instructions"
@@ -100,17 +105,13 @@ class TestHeraldApp:
         _, run_kwargs = mock_runner.run.call_args
         assert run_kwargs.get('session') == mock_session
 
+    @patch('herald.app._build_groq_model')
     @patch('herald.app.Runner')
     @patch('herald.app.Agent')
-    @patch('herald.app.trace')
-    @patch('herald.app.gen_trace_id')
     @pytest.mark.asyncio
-    async def test_run_uses_session_for_history(self, mock_gen_trace_id, mock_trace, mock_agent, mock_runner):
+    async def test_run_uses_session_for_history(self, mock_agent, mock_runner, mock_build_model):
         """Test that run passes the session to Runner so history is maintained."""
-        mock_gen_trace_id.return_value = "test_trace_id"
-        mock_trace.return_value.__enter__ = MagicMock()
-        mock_trace.return_value.__exit__ = MagicMock()
-
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
         mock_prompt = MagicMock()
         mock_prompt.type = "basic_prompt"
         mock_prompt.get_system_instructions.return_value = "Instructions"

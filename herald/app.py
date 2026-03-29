@@ -1,8 +1,22 @@
 """Application entry point for the herald package."""
 
-from agents import Agent, Runner, trace, gen_trace_id, SQLiteSession
+import os
+from openai import AsyncOpenAI
+from agents import Agent, Runner, SQLiteSession
+from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
 
 from herald.context_manager.icontext import ContextInterface
+
+_GROQ_MODEL = "openai/gpt-oss-120b"
+
+
+def _build_groq_model() -> OpenAIChatCompletionsModel:
+    """Build a Groq-backed chat completions model, bypassing the agents SDK prefix router."""
+    client = AsyncOpenAI(
+        api_key=os.environ["GROQ_API_KEY"],
+        base_url="https://api.groq.com/openai/v1",
+    )
+    return OpenAIChatCompletionsModel(model=_GROQ_MODEL, openai_client=client)
 
 
 class HeraldApp:
@@ -22,7 +36,7 @@ class HeraldApp:
         agent_options = {
             "name": "heralder",
             "instructions": self.prompt.get_system_instructions(),
-            "model": "gpt-5-nano",
+            "model": _build_groq_model(),
         }
 
         # Add vector store retriever to the agent options if the prompt type is RAG based
@@ -39,10 +53,7 @@ class HeraldApp:
         :param session: Per-user SQLiteSession that stores conversation history
         """
         print(f"Session ID: {session.session_id}")
-        trace_id = gen_trace_id()
-        with trace("Herald Trace", trace_id=trace_id):
-            print("Asking Herald!")
-            result = await Runner.run(
-                self.herald_agent(), message, session=session
-            )
-            yield result.final_output
+        result = await Runner.run(
+            self.herald_agent(), message, session=session
+        )
+        yield result.final_output

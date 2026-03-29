@@ -6,7 +6,8 @@ from contextlib import asynccontextmanager
 
 import dotenv
 import gradio as gr
-from agents import SQLiteSession
+from agents import SQLiteSession, set_default_openai_client, set_default_openai_api, set_tracing_disabled
+from openai import AsyncOpenAI
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,13 @@ from herald.herald_route import herald_router, HERALD_DB_PATH
 from herald.usage_tracker import UsageTracker
 
 dotenv.load_dotenv()
+
+set_default_openai_client(AsyncOpenAI(
+    api_key=os.environ.get("GROQ_API_KEY", ""),
+    base_url="https://api.groq.com/openai/v1",
+))
+set_default_openai_api("chat_completions")  # Groq only supports chat completions, not the Responses API
+set_tracing_disabled(True)  # Disable OpenAI-platform tracing — incompatible with non-OpenAI keys
 
 
 def cleanup_traces_db():

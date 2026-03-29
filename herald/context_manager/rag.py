@@ -5,7 +5,7 @@ This module implements a context manager that retrieves relevant information to 
 
 import tqdm
 import chromadb
-from openai import OpenAI
+from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 from agents.tool import function_tool
 
 
@@ -18,11 +18,14 @@ class CVVectorStore:
         :param list cv_chunks: The chunked CV data to be stored in the vector store.
         """
         self.__cv_chunks = cv_chunks
-        self.__client = OpenAI()
         # In-memory ChromaDB collection — rebuilt on every startup.
         # The CV is small enough that re-embedding takes only a few seconds and
         # avoids any dependency on a persistent filesystem (required for Railway).
-        self.__cv_collection = chromadb.Client().create_collection(name="cv_lookup")
+        # Uses ChromaDB's built-in ONNX embedding function — no external API needed.
+        self.__cv_collection = chromadb.Client().create_collection(
+            name="cv_lookup",
+            embedding_function=DefaultEmbeddingFunction(),
+        )
 
     def __normalize_chunk(self, chunk: dict) -> str:
         """Normalize the text for better retrieval."""
@@ -56,15 +59,8 @@ class CVVectorStore:
             normalized_text = self.__normalize_chunk(chunk)
 
             # TODO: clean the text if needed (e.g., remove extra whitespace, special characters, etc.)
-            # Create embeddings of the current chunk using OpenAI embeddings API
-            embedding = self.__client.embeddings.create(input=normalized_text, model="text-embedding-3-small")
-
-            # extract the embedding vector from the response
-            embedding_vector = embedding.data[0].embedding
-
-            # save to chromadb vector store
+            # ChromaDB's DefaultEmbeddingFunction handles embedding locally via ONNX — no external API needed.
             self.__cv_collection.add(
-                embeddings=[embedding_vector],
                 documents=[normalized_text],
                 ids=[f"chunk_{idx}"],
                 metadatas=[{"topic": chunk.get("topic", "Misc")}],
@@ -80,15 +76,9 @@ class CVVectorStore:
         :return: A list of relevant CV chunk texts.
         :rtype: list
         """
-        # create a embedding for the query
-        query_embedding = self.__client.embeddings.create(input=query, model="text-embedding-3-small")
-
-        # extract the embedding vector from the response
-        query_embedding_vector = query_embedding.data[0].embedding
-
-        # extract the relevant chunks from the vector store using cosine similarity search
+        # ChromaDB embeds the query locally and runs cosine similarity search
         query_kwargs = {
-            "query_embeddings": [query_embedding_vector],
+            "query_texts": [query],
             "n_results": top_k,
         }
         if topic:
