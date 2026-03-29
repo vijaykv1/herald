@@ -13,6 +13,7 @@ from herald.herald_route import (
     _get_or_create_session,
     SESSION_TTL_SECONDS,
 )
+from herald.usage_tracker import DAILY_MESSAGE_LIMIT
 
 
 class TestDependencies:
@@ -80,12 +81,17 @@ class TestGetOrCreateSession:
 class TestRoutes:
     """Tests for API route endpoints."""
 
-    def _make_app(self, herald_app=None, session_store=None):
+    def _make_app(self, herald_app=None, session_store=None, usage_tracker=None):
         app = FastAPI()
         app.include_router(herald_router)
         app.state.herald_prompt = MagicMock()
         app.state.herald_app = herald_app or MagicMock()
         app.state.session_store = session_store if session_store is not None else {}
+        if usage_tracker is None:
+            usage_tracker = MagicMock()
+            usage_tracker.check_quota.return_value = (0, DAILY_MESSAGE_LIMIT)
+            usage_tracker.increment.return_value = 1
+        app.state.usage_tracker = usage_tracker
         return app
 
     def test_root_returns_version(self):
@@ -111,4 +117,7 @@ class TestRoutes:
         )
 
         assert response.status_code == 200
-        assert response.json() == {"response": "Test response"}
+        assert response.json() == {
+            "response": "Test response",
+            "usage": {"used": 1, "limit": DAILY_MESSAGE_LIMIT, "remaining": DAILY_MESSAGE_LIMIT - 1},
+        }
