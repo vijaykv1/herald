@@ -20,6 +20,7 @@ from herald.app import HeraldApp
 from herald.context_manager.prompt_based import HeraldBasicPrompter
 from herald.context_manager.rag_based import HeraldRAGContextManager
 from herald.herald_route import herald_router, HERALD_DB_PATH
+from herald.usage_tracker import UsageTracker
 
 dotenv.load_dotenv()
 
@@ -76,15 +77,23 @@ async def lifespan_context(app: FastAPI):  # pylint: disable=unused-argument
     app.state.herald_prompt = HeraldRAGContextManager()  # or use HeraldBasicPrompter()
     app.state.herald_app = HeraldApp(prompt=app.state.herald_prompt)
     app.state.session_store = {}  # session_id → (SQLiteSession, last_active_monotonic)
+    app.state.usage_tracker = UsageTracker()  # persistent per-user daily quota tracking
     yield
     cleanup_traces_db()
 
 
 herald_app = FastAPI(lifespan=lifespan_context)
 
+ALLOWED_ORIGINS = [
+    origin for origin in [
+        os.getenv("PORTFOLIO_ORIGIN", ""),   # e.g. https://yourportfolio.com
+        "http://localhost:3000",             # Next.js local dev
+    ] if origin
+]
+
 herald_app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten later
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
