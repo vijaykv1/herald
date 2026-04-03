@@ -33,10 +33,18 @@ class CVVectorStore:
         else:  # dict
             content = "\n".join([f"{k}: {v}" for k, v in chunk["content"].items()])
 
+        # Tag current roles explicitly so "currently working" queries match strongly
+        is_current_role = (
+            topic == "Experience"
+            and isinstance(chunk["content"], dict)
+            and "present" in chunk["content"].get("duration", "").lower()
+        )
+        current_label = "Current Role (Present Position)\n" if is_current_role else ""
+
         norm_chunk = f"""
 ### CV Section: {topic}
 
-{content}
+{current_label}{content}
 """.strip()
         # print(f"Normalized chunk:\n{norm_chunk}\n")
         return norm_chunk
