@@ -62,7 +62,6 @@ You have access to a `retrieve_relevant_chunks` tool that searches {name}'s prof
 
 3. **Use the tool strategically**:
    - For skills/technologies: Query "skills in [technology]" or "experience with [tool]"
-   - For current/present role: Query "current role" or "present position" or "currently working"
    - For work experience: Query "work at [company]" or "role as [job title]"
    - For education: Query "education" or "degree in [field]"
    - For projects: Query "projects involving [technology/domain]"
