@@ -6,7 +6,7 @@ This module implements a context manager that retrieves relevant information to 
 import tqdm
 import chromadb
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
-from agents.tool import function_tool
+from agents.tool import function_tool, FunctionTool
 
 
 class CVVectorStore:
@@ -103,19 +103,25 @@ class CVVectorStore:
     def create_tools(self) -> list:
         """Create topic-specific tool wrappers for the retrieve_relevant_chunks method."""
 
-        @function_tool
-        def list_all_experience_chunks() -> list:
-            """
-            Return every work experience entry from the CV without any filtering.
-            Use this tool when the question asks for a complete list — e.g.
-            "Which companies have you worked at?", "List all your jobs",
-            "How many roles have you had?", or any question that requires
-            enumerating all experience rather than finding the most relevant one.
-
-            Returns:
-                A list of all work experience chunk texts.
-            """
+        # FunctionTool used directly so we can supply an explicit schema with
+        # "properties": {} — function_tool() on a no-arg function omits "properties",
+        # which Groq rejects as invalid JSON Schema.
+        async def _list_all_experience_impl(_ctx, _args: str) -> list:
             return self.get_all_chunks_by_topic("Experience")
+
+        list_all_experience_chunks = FunctionTool(
+            name="list_all_experience_chunks",
+            description=(
+                "Return every work experience entry from the CV without any filtering. "
+                "Use this tool when the question asks for a complete list — e.g. "
+                "'Which companies have you worked at?', 'List all your jobs', "
+                "'How many roles have you had?', or any question that requires "
+                "enumerating all experience rather than finding the most relevant one."
+            ),
+            params_json_schema={"type": "object", "properties": {}},
+            on_invoke_tool=_list_all_experience_impl,
+            strict_json_schema=False,
+        )
 
         @function_tool
         def retrieve_experience_chunks(query: str, top_k: int = 4) -> list:

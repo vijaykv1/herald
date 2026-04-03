@@ -129,9 +129,10 @@ class TestCVVectorStore:
         call_kwargs = mock_collection.query.call_args[1]
         assert call_kwargs['n_results'] == 3
 
+    @patch('herald.context_manager.rag.FunctionTool')
     @patch('herald.context_manager.rag.function_tool')
     @patch('herald.context_manager.rag.chromadb.Client')
-    def test_create_tools(self, mock_chromadb, mock_function_tool, sample_cv_chunks):
+    def test_create_tools(self, mock_chromadb, mock_function_tool, mock_function_tool_cls, sample_cv_chunks):
         """Test creating topic-specific tools for agent use."""
         mock_client = MagicMock()
         mock_client.create_collection.return_value = MagicMock()
@@ -139,12 +140,15 @@ class TestCVVectorStore:
 
         mock_tool = MagicMock()
         mock_function_tool.return_value = mock_tool
+        mock_function_tool_cls.return_value = mock_tool
 
         vector_store = CVVectorStore(sample_cv_chunks)
         tools = vector_store.create_tools()
 
-        # Verify function_tool was called once per tool and a list is returned
-        assert mock_function_tool.call_count == 6  # 6 topic-specific tools
+        # list_all_experience_chunks uses FunctionTool directly (no-arg tool needs explicit schema)
+        # the remaining 5 tools use the function_tool decorator
+        assert mock_function_tool_cls.call_count == 1
+        assert mock_function_tool.call_count == 5
         assert isinstance(tools, list)
         assert len(tools) == 6
 
