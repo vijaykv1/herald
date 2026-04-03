@@ -166,8 +166,8 @@ class TestCVVectorStore:
     @patch('herald.context_manager.rag.function_tool')
     @patch('herald.context_manager.rag.chromadb.Client')
     @patch('herald.context_manager.rag.OpenAI')
-    def test_create_tool(self, mock_openai, mock_chromadb, mock_function_tool, sample_cv_chunks):
-        """Test creating a tool for agent use."""
+    def test_create_tools(self, mock_openai, mock_chromadb, mock_function_tool, sample_cv_chunks):
+        """Test creating topic-specific tools for agent use."""
         mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_client.create_collection.return_value = mock_collection
@@ -177,16 +177,17 @@ class TestCVVectorStore:
         mock_function_tool.return_value = mock_tool
 
         vector_store = CVVectorStore(sample_cv_chunks)
-        tool = vector_store.create_tool()
+        tools = vector_store.create_tools()
 
-        # Verify function_tool was called
-        mock_function_tool.assert_called_once()
-        assert tool == mock_tool
+        # Verify function_tool was called once per tool and a list is returned
+        assert mock_function_tool.call_count == 6  # 6 topic-specific tools
+        assert isinstance(tools, list)
+        assert len(tools) == 6
 
     @patch('herald.context_manager.rag.chromadb.Client')
     @patch('herald.context_manager.rag.OpenAI')
-    def test_create_tool_inner_function_delegates(self, mock_openai, mock_chromadb, sample_cv_chunks):
-        """Test that calling the inner tool function delegates to retrieve_relevant_chunks."""
+    def test_create_tools_inner_function_delegates(self, mock_openai, mock_chromadb, sample_cv_chunks):
+        """Test that calling an inner tool function delegates to retrieve_relevant_chunks."""
         mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_client.create_collection.return_value = mock_collection
@@ -204,10 +205,12 @@ class TestCVVectorStore:
             'metadatas': [[{'topic': 'Skills'}]],
         }
 
-        # Use function_tool as identity so the inner fn is directly callable
+        # Use function_tool as identity so the inner fns are directly callable
         with patch('herald.context_manager.rag.function_tool', side_effect=lambda f: f):
             vector_store = CVVectorStore(sample_cv_chunks)
-            inner_fn = vector_store.create_tool()
-            result = inner_fn(query="Python skills", top_k=1)
+            tools = vector_store.create_tools()
+            # retrieve_experience_chunks is the second tool (index 1)
+            retrieve_experience = tools[1]
+            result = retrieve_experience(query="Python skills", top_k=1)
 
         assert result == ['Relevant chunk']

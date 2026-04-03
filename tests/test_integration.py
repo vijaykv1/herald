@@ -51,7 +51,7 @@ class TestIntegration:
             
             assert rag_manager.type == "rag_based"
             assert "RAG Test User" in instructions
-            assert "retrieve_relevant_chunks" in instructions
+            assert "retrieve_experience_chunks" in instructions
             assert rag_manager.context_store == mock_store_instance
 
     @patch('herald.app.Runner')

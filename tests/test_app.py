@@ -49,9 +49,9 @@ class TestHeraldApp:
     @patch('herald.app.Agent')
     def test_herald_agent_rag(self, mock_agent):
         """Test herald_agent creation with RAG prompt includes tools."""
-        mock_tool = MagicMock()
+        mock_tools = [MagicMock(), MagicMock()]
         mock_context_store = MagicMock()
-        mock_context_store.create_tool.return_value = mock_tool
+        mock_context_store.create_tools.return_value = mock_tools
 
         mock_prompt = MagicMock()
         mock_prompt.type = "rag_based"
@@ -64,7 +64,7 @@ class TestHeraldApp:
         mock_agent.assert_called_once()
         call_kwargs = mock_agent.call_args[1]
         assert 'tools' in call_kwargs
-        assert call_kwargs['tools'] == [mock_tool]
+        assert call_kwargs['tools'] == mock_tools
 
     @patch('herald.app.Runner')
     @patch('herald.app.Agent')
