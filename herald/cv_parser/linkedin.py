@@ -123,13 +123,18 @@ class LinkedInCVParser(CVParserInterface):
         """
         if i >= 3 and total_duration_pattern.match(lines[i - 2]):
             return lines[i - 3]
-        if last_company and (
-            lines[i - 2].startswith("-")
-            or lines[i - 2].startswith("•")
-            or len(lines[i - 2]) > 80
-        ):
+
+        preceding = lines[i - 2]
+        is_not_company = (
+            preceding.startswith("-")           # bullet point
+            or preceding.startswith("•")        # bullet point
+            or preceding.endswith(".")          # sentence ending → description
+            or len(preceding) > 60              # long line → description
+            or (preceding == preceding.lower() and " " not in preceding)  # single lowercase word → artifact
+        )
+        if last_company and is_not_company:
             return last_company
-        return lines[i - 2]
+        return preceding
 
     @staticmethod
     def _parse_experience(content: str) -> dict:
