@@ -17,7 +17,7 @@ SESSION_TTL_SECONDS = 30 * 60  # 30 minutes
 HERALD_DB_PATH = "herald_traces.db"
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(BaseModel):  # pylint: disable=too-few-public-methods
     """Chat request model for the API."""
     message: str = Field(description="Chat message")
     session_id: str = Field(description="Session Identifier")

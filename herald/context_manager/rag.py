@@ -70,12 +70,13 @@ class CVVectorStore:
                 metadatas=[{"topic": chunk.get("topic", "Misc")}],
             )
 
-    def retrieve_relevant_chunks(self, query: str, top_k: int = 4) -> list:
+    def retrieve_relevant_chunks(self, query: str, top_k: int = 4, topic: str = None) -> list:
         """
         Retrieve relevant chunks from the vector store based on the query using cosine similarity search.
 
         :param str query: The query string to search for relevant CV chunks.
         :param int top_k: The number of top relevant chunks to retrieve.
+        :param str topic: Optional topic filter to restrict search to a specific CV section.
         :return: A list of relevant CV chunk texts.
         :rtype: list
         """
@@ -85,31 +86,133 @@ class CVVectorStore:
         # extract the embedding vector from the response
         query_embedding_vector = query_embedding.data[0].embedding
 
-        # extract the relavent chunks from the vector store using cosine similarity search
-        results = self.__cv_collection.query(
-            query_embeddings=[query_embedding_vector],
-            n_results=top_k,
-        )
+        # extract the relevant chunks from the vector store using cosine similarity search
+        query_kwargs = {
+            "query_embeddings": [query_embedding_vector],
+            "n_results": top_k,
+        }
+        if topic:
+            query_kwargs["where"] = {"topic": topic}
+
+        results = self.__cv_collection.query(**query_kwargs)
 
         docs = results.get("documents", [])  # get the documents from the results, default to empty list if not found
 
         return docs[0] if docs else []
 
-    def create_tool(self):
-        """Create a tool wrapper for the retrieve_relevant_chunks method."""
+    def get_all_chunks_by_topic(self, topic: str) -> list:
+        """Return all stored chunks for a given topic without similarity search.
+
+        :param str topic: The topic to filter by (e.g. "Experience").
+        :return: All chunk documents for that topic.
+        :rtype: list
+        """
+        results = self.__cv_collection.get(where={"topic": topic})
+        return results.get("documents", [])
+
+    def create_tools(self) -> list:
+        """Create topic-specific tool wrappers for the retrieve_relevant_chunks method."""
 
         @function_tool
-        def retrieve_relevant_chunks(query: str, top_k: int = 4) -> list:
+        def list_all_experience_chunks() -> list:
             """
-            Retrieve relevant chunks from the CV based on the query using cosine similarity search.
+            Return every work experience entry from the CV without any filtering.
+            Use this tool when the question asks for a complete list — e.g.
+            "Which companies have you worked at?", "List all your jobs",
+            "How many roles have you had?", or any question that requires
+            enumerating all experience rather than finding the most relevant one.
+
+            Returns:
+                A list of all work experience chunk texts.
+            """
+            return self.get_all_chunks_by_topic("Experience")
+
+        @function_tool
+        def retrieve_experience_chunks(query: str, top_k: int = 4) -> list:
+            """
+            Retrieve relevant chunks from the work experience section of the CV.
+            Use this tool for questions about jobs, roles, companies, employment history,
+            or anything related to where the candidate has worked.
 
             Args:
-                query: The query string to search for relevant CV chunks.
+                query: The query string to search for relevant experience chunks.
                 top_k: The number of top relevant chunks to retrieve (default: 4).
 
             Returns:
-                A list of relevant CV chunk texts.
+                A list of relevant work experience chunk texts.
+            """
+            return self.retrieve_relevant_chunks(query, top_k, topic="Experience")
+
+        @function_tool
+        def retrieve_skills_chunks(query: str, top_k: int = 3) -> list:
+            """
+            Retrieve relevant chunks from the skills section of the CV.
+            Use this tool for questions about technical skills, programming languages,
+            frameworks, tools, or technologies.
+
+            Args:
+                query: The query string to search for relevant skills chunks.
+                top_k: The number of top relevant chunks to retrieve (default: 3).
+
+            Returns:
+                A list of relevant skills chunk texts.
+            """
+            return self.retrieve_relevant_chunks(query, top_k, topic="Skills")
+
+        @function_tool
+        def retrieve_education_chunks(query: str, top_k: int = 3) -> list:
+            """
+            Retrieve relevant chunks from the education section of the CV.
+            Use this tool for questions about degrees, universities, certifications,
+            courses, or academic background.
+
+            Args:
+                query: The query string to search for relevant education chunks.
+                top_k: The number of top relevant chunks to retrieve (default: 3).
+
+            Returns:
+                A list of relevant education chunk texts.
+            """
+            return self.retrieve_relevant_chunks(query, top_k, topic="Education")
+
+        @function_tool
+        def retrieve_projects_chunks(query: str, top_k: int = 3) -> list:
+            """
+            Retrieve relevant chunks from the projects section of the CV.
+            Use this tool for questions about personal projects, side projects,
+            open source contributions, or specific project details.
+
+            Args:
+                query: The query string to search for relevant project chunks.
+                top_k: The number of top relevant chunks to retrieve (default: 3).
+
+            Returns:
+                A list of relevant project chunk texts.
+            """
+            return self.retrieve_relevant_chunks(query, top_k, topic="Projects")
+
+        @function_tool
+        def retrieve_profile_chunks(query: str, top_k: int = 3) -> list:
+            """
+            Retrieve relevant chunks from the general profile sections of the CV,
+            including summary, contact information, certifications, languages, and publications.
+            Use this tool for broad questions about the candidate's overall profile,
+            or when no other specific tool applies.
+
+            Args:
+                query: The query string to search for relevant profile chunks.
+                top_k: The number of top relevant chunks to retrieve (default: 3).
+
+            Returns:
+                A list of relevant profile chunk texts.
             """
             return self.retrieve_relevant_chunks(query, top_k)
 
-        return retrieve_relevant_chunks
+        return [
+            list_all_experience_chunks,
+            retrieve_experience_chunks,
+            retrieve_skills_chunks,
+            retrieve_education_chunks,
+            retrieve_projects_chunks,
+            retrieve_profile_chunks,
+        ]

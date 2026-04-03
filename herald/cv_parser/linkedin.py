@@ -7,6 +7,7 @@
 """
 
 import re
+import logging
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 
 from herald.cv_parser.iparser import CVParserInterface
@@ -81,6 +82,61 @@ class LinkedInCVParser(CVParserInterface):
         return chunks
 
     @staticmethod
+    def _build_patterns() -> tuple:
+        """Build and return the compiled job date and total-duration regex patterns.
+
+        :return: Tuple of (job_pattern, total_duration_pattern)
+        :rtype: tuple
+        """
+        month_names = (
+            r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|"
+            r"January|February|March|April|May|June|July|August|"
+            r"September|October|November|December)"
+        )
+        month_year = rf"{month_names}\s+\d{{4}}"
+        start_date = rf"(?:{month_year}|\d{{4}})"
+        end_date = rf"(?:Present|{month_year}|\d{{4}})"
+        job_pattern = re.compile(
+            rf"^{start_date}\s*-\s*{end_date}"
+            r"(?:\s*\([^)]*\))?$",
+            re.IGNORECASE,
+        )
+        total_duration_pattern = re.compile(
+            r"^\d+\s+years?(?:\s+\d+\s+months?)?$|^\d+\s+months?$",
+            re.IGNORECASE,
+        )
+        return job_pattern, total_duration_pattern
+
+    @staticmethod
+    def _resolve_company(lines: list, i: int, total_duration_pattern: re.Pattern, last_company: str) -> str:
+        """Resolve the company name for a job entry.
+
+        LinkedIn omits the company name for subsequent roles at the same company, and
+        inserts a total-duration line between the company name and the first role title.
+
+        :param list lines: Cleaned lines from the experience section.
+        :param int i: Index of the current date line.
+        :param re.Pattern total_duration_pattern: Pattern matching total-duration lines.
+        :param str last_company: Most recently seen company name.
+        :return: Resolved company name.
+        :rtype: str
+        """
+        if i >= 3 and total_duration_pattern.match(lines[i - 2]):
+            return lines[i - 3]
+
+        preceding = lines[i - 2]
+        is_not_company = (
+            preceding.startswith("-")           # bullet point
+            or preceding.startswith("•")        # bullet point
+            or preceding.endswith(".")          # sentence ending → description
+            or len(preceding) > 60              # long line → description
+            or (preceding == preceding.lower() and " " not in preceding)  # single lowercase word → artifact
+        )
+        if last_company and is_not_company:
+            return last_company
+        return preceding
+
+    @staticmethod
     def _parse_experience(content: str) -> dict:
         """Parse the experience section of the CV.
 
@@ -96,37 +152,37 @@ class LinkedInCVParser(CVParserInterface):
         :return: Jobs as a list of dictionaries with keys "title", "company", "duration", "description"
         :rtype: dict
         """
-        jobs = {}
-        # print("Content to parse for experience section: \n", content)
-
-        # lets create a simple regex to extract the section into different jobs, we will assume that each job starts
-        # with a line that has the format "Title at Company (Duration)"
-        job_pattern = re.compile(
-            r"^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|"
-            r"January|February|March|April|May|June|July|August|"
-            r"September|October|November|December)\s+\d{4}\s*-\s*"
-            r"(?:Present|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|"
-            r"Nov|Dec|January|February|March|April|May|June|July|"
-            r"August|September|October|November|December)\s+\d{4}|\d{4})"
-            r"\s*\([^)]*\)$"
-        )
+        job_pattern, total_duration_pattern = LinkedInCVParser._build_patterns()
 
         # clean lines
         lines = [
             line.strip() for line in content.splitlines() if line.strip() and not line.strip().startswith("Page ")
         ]
 
+        logger = logging.getLogger(__name__)
+
         jobs = []
+        last_company = None
         i = 0
         while i < len(lines):
             if job_pattern.match(lines[i]):
-                company_info = lines[i - 2]
+                if i < 2:
+                    logger.warning(
+                        "Skipping job entry at line %d — not enough preceding lines for company/title extraction.",
+                        i,
+                    )
+                    i += 1
+                    continue
+
                 title_info = lines[i - 1]
+                company_info = LinkedInCVParser._resolve_company(
+                    lines, i, total_duration_pattern, last_company
+                )
+                last_company = company_info
+
                 duration_info = lines[i]
-                # location = lines[i+1]
                 description_info = []
-                i += 1  # lets move the pointer to the next line after the location line
-                # print("----> Found a job line: ", company_info)
+                i += 1  # move past the date line
                 while i < len(lines) and not job_pattern.match(lines[i]):
                     description_info.append(lines[i])
                     i += 1
@@ -136,7 +192,6 @@ class LinkedInCVParser(CVParserInterface):
                         "content": {
                             "company": company_info,
                             "title": title_info,
-                            # "location": location,
                             "duration": duration_info,
                             "description": "\n".join(description_info),
                         },

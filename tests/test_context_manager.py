@@ -188,7 +188,7 @@ class TestHeraldRAGContextManager:
         
         # Should contain instructions about using the retrieval tool
         assert "Test User" in instructions
-        assert "retrieve_relevant_chunks" in instructions
+        assert "retrieve_experience_chunks" in instructions
         assert "tool" in instructions.lower()
         assert "retrieval" in instructions.lower()
 
