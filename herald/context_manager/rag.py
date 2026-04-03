@@ -5,8 +5,8 @@ This module implements a context manager that retrieves relevant information to 
 
 import tqdm
 import chromadb
-from openai import OpenAI
-from agents.tool import function_tool
+from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+from agents.tool import function_tool, FunctionTool
 
 
 class CVVectorStore:
@@ -18,11 +18,14 @@ class CVVectorStore:
         :param list cv_chunks: The chunked CV data to be stored in the vector store.
         """
         self.__cv_chunks = cv_chunks
-        self.__client = OpenAI()
         # In-memory ChromaDB collection — rebuilt on every startup.
         # The CV is small enough that re-embedding takes only a few seconds and
         # avoids any dependency on a persistent filesystem (required for Railway).
-        self.__cv_collection = chromadb.Client().create_collection(name="cv_lookup")
+        # Uses ChromaDB's built-in ONNX embedding function — no external API needed.
+        self.__cv_collection = chromadb.Client().create_collection(
+            name="cv_lookup",
+            embedding_function=DefaultEmbeddingFunction(),
+        )
 
     def __normalize_chunk(self, chunk: dict) -> str:
         """Normalize the text for better retrieval."""
@@ -56,15 +59,8 @@ class CVVectorStore:
             normalized_text = self.__normalize_chunk(chunk)
 
             # TODO: clean the text if needed (e.g., remove extra whitespace, special characters, etc.)
-            # Create embeddings of the current chunk using OpenAI embeddings API
-            embedding = self.__client.embeddings.create(input=normalized_text, model="text-embedding-3-small")
-
-            # extract the embedding vector from the response
-            embedding_vector = embedding.data[0].embedding
-
-            # save to chromadb vector store
+            # ChromaDB's DefaultEmbeddingFunction handles embedding locally via ONNX — no external API needed.
             self.__cv_collection.add(
-                embeddings=[embedding_vector],
                 documents=[normalized_text],
                 ids=[f"chunk_{idx}"],
                 metadatas=[{"topic": chunk.get("topic", "Misc")}],
@@ -80,15 +76,9 @@ class CVVectorStore:
         :return: A list of relevant CV chunk texts.
         :rtype: list
         """
-        # create a embedding for the query
-        query_embedding = self.__client.embeddings.create(input=query, model="text-embedding-3-small")
-
-        # extract the embedding vector from the response
-        query_embedding_vector = query_embedding.data[0].embedding
-
-        # extract the relevant chunks from the vector store using cosine similarity search
+        # ChromaDB embeds the query locally and runs cosine similarity search
         query_kwargs = {
-            "query_embeddings": [query_embedding_vector],
+            "query_texts": [query],
             "n_results": top_k,
         }
         if topic:
@@ -113,19 +103,25 @@ class CVVectorStore:
     def create_tools(self) -> list:
         """Create topic-specific tool wrappers for the retrieve_relevant_chunks method."""
 
-        @function_tool
-        def list_all_experience_chunks() -> list:
-            """
-            Return every work experience entry from the CV without any filtering.
-            Use this tool when the question asks for a complete list — e.g.
-            "Which companies have you worked at?", "List all your jobs",
-            "How many roles have you had?", or any question that requires
-            enumerating all experience rather than finding the most relevant one.
-
-            Returns:
-                A list of all work experience chunk texts.
-            """
+        # FunctionTool used directly so we can supply an explicit schema with
+        # "properties": {} — function_tool() on a no-arg function omits "properties",
+        # which Groq rejects as invalid JSON Schema.
+        async def _list_all_experience_impl(_ctx, _args: str) -> list:
             return self.get_all_chunks_by_topic("Experience")
+
+        list_all_experience_chunks = FunctionTool(
+            name="list_all_experience_chunks",
+            description=(
+                "Return every work experience entry from the CV without any filtering. "
+                "Use this tool when the question asks for a complete list — e.g. "
+                "'Which companies have you worked at?', 'List all your jobs', "
+                "'How many roles have you had?', or any question that requires "
+                "enumerating all experience rather than finding the most relevant one."
+            ),
+            params_json_schema={"type": "object", "properties": {}},
+            on_invoke_tool=_list_all_experience_impl,
+            strict_json_schema=False,
+        )
 
         @function_tool
         def retrieve_experience_chunks(query: str, top_k: int = 4) -> list:

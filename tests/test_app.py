@@ -2,7 +2,9 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from herald.app import HeraldApp
+from openai import APIConnectionError, RateLimitError, APIStatusError
+from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
+from herald.app import HeraldApp, _GROQ_MODEL, _FALLBACK_MODEL
 from herald.context_manager.prompt_based import HeraldBasicPrompter
 from herald.context_manager.rag_based import HeraldRAGContextManager
 
@@ -29,9 +31,14 @@ class TestHeraldApp:
 
         assert app.prompt == mock_prompt
 
+    @patch('herald.app._build_groq_model')
     @patch('herald.app.Agent')
-    def test_herald_agent_basic(self, mock_agent):
+    def test_herald_agent_basic(self, mock_agent, mock_build_model):
         """Test herald_agent creation with basic prompt."""
+        mock_model = MagicMock(spec=OpenAIChatCompletionsModel)
+        mock_model.model = _GROQ_MODEL
+        mock_build_model.return_value = mock_model
+
         mock_prompt = MagicMock()
         mock_prompt.type = "basic_prompt"
         mock_prompt.get_system_instructions.return_value = "Test instructions"
@@ -43,12 +50,15 @@ class TestHeraldApp:
         call_kwargs = mock_agent.call_args[1]
         assert call_kwargs['name'] == "heralder"
         assert call_kwargs['instructions'] == "Test instructions"
-        assert call_kwargs['model'] == "gpt-5-nano"
+        assert call_kwargs['model'] == mock_model
         assert 'tools' not in call_kwargs
 
+    @patch('herald.app._build_groq_model')
     @patch('herald.app.Agent')
-    def test_herald_agent_rag(self, mock_agent):
+    def test_herald_agent_rag(self, mock_agent, mock_build_model):
         """Test herald_agent creation with RAG prompt includes tools."""
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
+
         mock_tools = [MagicMock(), MagicMock()]
         mock_context_store = MagicMock()
         mock_context_store.create_tools.return_value = mock_tools
@@ -66,17 +76,27 @@ class TestHeraldApp:
         assert 'tools' in call_kwargs
         assert call_kwargs['tools'] == mock_tools
 
+    @patch('herald.app.Agent')
+    def test_fallback_agent_uses_openai_model(self, mock_agent):
+        """Test that _fallback_agent uses the OpenAI fallback model string."""
+        mock_prompt = MagicMock()
+        mock_prompt.type = "basic_prompt"
+        mock_prompt.get_system_instructions.return_value = "Instructions"
+
+        app = HeraldApp(prompt=mock_prompt)
+        app._fallback_agent()
+
+        mock_agent.assert_called_once()
+        call_kwargs = mock_agent.call_args[1]
+        assert call_kwargs['model'] == _FALLBACK_MODEL
+
+    @patch('herald.app._build_groq_model')
     @patch('herald.app.Runner')
     @patch('herald.app.Agent')
-    @patch('herald.app.trace')
-    @patch('herald.app.gen_trace_id')
     @pytest.mark.asyncio
-    async def test_run_success(self, mock_gen_trace_id, mock_trace, mock_agent, mock_runner):
+    async def test_run_success(self, mock_agent, mock_runner, mock_build_model):
         """Test successful run of query with a session."""
-        mock_gen_trace_id.return_value = "test_trace_id"
-        mock_trace.return_value.__enter__ = MagicMock()
-        mock_trace.return_value.__exit__ = MagicMock()
-
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
         mock_prompt = MagicMock()
         mock_prompt.type = "basic_prompt"
         mock_prompt.get_system_instructions.return_value = "Instructions"
@@ -100,17 +120,13 @@ class TestHeraldApp:
         _, run_kwargs = mock_runner.run.call_args
         assert run_kwargs.get('session') == mock_session
 
+    @patch('herald.app._build_groq_model')
     @patch('herald.app.Runner')
     @patch('herald.app.Agent')
-    @patch('herald.app.trace')
-    @patch('herald.app.gen_trace_id')
     @pytest.mark.asyncio
-    async def test_run_uses_session_for_history(self, mock_gen_trace_id, mock_trace, mock_agent, mock_runner):
+    async def test_run_uses_session_for_history(self, mock_agent, mock_runner, mock_build_model):
         """Test that run passes the session to Runner so history is maintained."""
-        mock_gen_trace_id.return_value = "test_trace_id"
-        mock_trace.return_value.__enter__ = MagicMock()
-        mock_trace.return_value.__exit__ = MagicMock()
-
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
         mock_prompt = MagicMock()
         mock_prompt.type = "basic_prompt"
         mock_prompt.get_system_instructions.return_value = "Instructions"
@@ -131,3 +147,65 @@ class TestHeraldApp:
         # The same session object must be passed — Runner handles history internally
         _, run_kwargs = mock_runner.run.call_args
         assert run_kwargs.get('session') is mock_session
+
+    @patch('herald.app._build_groq_model')
+    @patch('herald.app.Runner')
+    @patch('herald.app.Agent')
+    @pytest.mark.asyncio
+    async def test_run_falls_back_on_groq_connection_error(self, mock_agent, mock_runner, mock_build_model):
+        """Test that run falls back to OpenAI when Groq raises APIConnectionError."""
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
+        mock_prompt = MagicMock()
+        mock_prompt.type = "basic_prompt"
+        mock_prompt.get_system_instructions.return_value = "Instructions"
+
+        mock_fallback_result = MagicMock()
+        mock_fallback_result.final_output = "Fallback response"
+        mock_runner.run = AsyncMock(
+            side_effect=[APIConnectionError(request=MagicMock()), mock_fallback_result]
+        )
+
+        mock_session = MagicMock()
+        mock_session.session_id = "fallback-session"
+
+        app = HeraldApp(prompt=mock_prompt)
+        results = []
+        async for chunk in app.run(message="Test query", session=mock_session):
+            results.append(chunk)
+
+        assert mock_runner.run.call_count == 2
+        assert results == ["Fallback response"]
+
+    @patch('herald.app._build_groq_model')
+    @patch('herald.app.Runner')
+    @patch('herald.app.Agent')
+    @pytest.mark.asyncio
+    async def test_run_falls_back_on_groq_rate_limit(self, mock_agent, mock_runner, mock_build_model):
+        """Test that run falls back to OpenAI when Groq raises RateLimitError."""
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
+        mock_prompt = MagicMock()
+        mock_prompt.type = "basic_prompt"
+        mock_prompt.get_system_instructions.return_value = "Instructions"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.headers = {}
+        mock_fallback_result = MagicMock()
+        mock_fallback_result.final_output = "Fallback response"
+        mock_runner.run = AsyncMock(
+            side_effect=[
+                RateLimitError(message="rate limit", response=mock_response, body={}),
+                mock_fallback_result,
+            ]
+        )
+
+        mock_session = MagicMock()
+        mock_session.session_id = "rate-limit-session"
+
+        app = HeraldApp(prompt=mock_prompt)
+        results = []
+        async for chunk in app.run(message="Test query", session=mock_session):
+            results.append(chunk)
+
+        assert mock_runner.run.call_count == 2
+        assert results == ["Fallback response"]

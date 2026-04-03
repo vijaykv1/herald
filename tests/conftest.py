@@ -131,7 +131,7 @@ def sample_cv_chunks():
 def mock_env_vars(monkeypatch, temp_cv_pdf):
     """Mock environment variables."""
     monkeypatch.setenv("CV_PATH", temp_cv_pdf)
-    monkeypatch.setenv("OPENAI_API_KEY", "test_api_key")
+    monkeypatch.setenv("GROQ_API_KEY", "test_groq_api_key")
     monkeypatch.setenv("ME", "Test User")
     monkeypatch.setenv("WITH_BROWSER", "no")
     monkeypatch.setenv("PROMPT_OPTION", "basic")
