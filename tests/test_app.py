@@ -2,8 +2,9 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
+from openai import APIConnectionError, RateLimitError, APIStatusError
 from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
-from herald.app import HeraldApp, _GROQ_MODEL
+from herald.app import HeraldApp, _GROQ_MODEL, _FALLBACK_MODEL
 from herald.context_manager.prompt_based import HeraldBasicPrompter
 from herald.context_manager.rag_based import HeraldRAGContextManager
 
@@ -75,6 +76,20 @@ class TestHeraldApp:
         assert 'tools' in call_kwargs
         assert call_kwargs['tools'] == mock_tools
 
+    @patch('herald.app.Agent')
+    def test_fallback_agent_uses_openai_model(self, mock_agent):
+        """Test that _fallback_agent uses the OpenAI fallback model string."""
+        mock_prompt = MagicMock()
+        mock_prompt.type = "basic_prompt"
+        mock_prompt.get_system_instructions.return_value = "Instructions"
+
+        app = HeraldApp(prompt=mock_prompt)
+        app._fallback_agent()
+
+        mock_agent.assert_called_once()
+        call_kwargs = mock_agent.call_args[1]
+        assert call_kwargs['model'] == _FALLBACK_MODEL
+
     @patch('herald.app._build_groq_model')
     @patch('herald.app.Runner')
     @patch('herald.app.Agent')
@@ -132,3 +147,65 @@ class TestHeraldApp:
         # The same session object must be passed — Runner handles history internally
         _, run_kwargs = mock_runner.run.call_args
         assert run_kwargs.get('session') is mock_session
+
+    @patch('herald.app._build_groq_model')
+    @patch('herald.app.Runner')
+    @patch('herald.app.Agent')
+    @pytest.mark.asyncio
+    async def test_run_falls_back_on_groq_connection_error(self, mock_agent, mock_runner, mock_build_model):
+        """Test that run falls back to OpenAI when Groq raises APIConnectionError."""
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
+        mock_prompt = MagicMock()
+        mock_prompt.type = "basic_prompt"
+        mock_prompt.get_system_instructions.return_value = "Instructions"
+
+        mock_fallback_result = MagicMock()
+        mock_fallback_result.final_output = "Fallback response"
+        mock_runner.run = AsyncMock(
+            side_effect=[APIConnectionError(request=MagicMock()), mock_fallback_result]
+        )
+
+        mock_session = MagicMock()
+        mock_session.session_id = "fallback-session"
+
+        app = HeraldApp(prompt=mock_prompt)
+        results = []
+        async for chunk in app.run(message="Test query", session=mock_session):
+            results.append(chunk)
+
+        assert mock_runner.run.call_count == 2
+        assert results == ["Fallback response"]
+
+    @patch('herald.app._build_groq_model')
+    @patch('herald.app.Runner')
+    @patch('herald.app.Agent')
+    @pytest.mark.asyncio
+    async def test_run_falls_back_on_groq_rate_limit(self, mock_agent, mock_runner, mock_build_model):
+        """Test that run falls back to OpenAI when Groq raises RateLimitError."""
+        mock_build_model.return_value = MagicMock(spec=OpenAIChatCompletionsModel)
+        mock_prompt = MagicMock()
+        mock_prompt.type = "basic_prompt"
+        mock_prompt.get_system_instructions.return_value = "Instructions"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.headers = {}
+        mock_fallback_result = MagicMock()
+        mock_fallback_result.final_output = "Fallback response"
+        mock_runner.run = AsyncMock(
+            side_effect=[
+                RateLimitError(message="rate limit", response=mock_response, body={}),
+                mock_fallback_result,
+            ]
+        )
+
+        mock_session = MagicMock()
+        mock_session.session_id = "rate-limit-session"
+
+        app = HeraldApp(prompt=mock_prompt)
+        results = []
+        async for chunk in app.run(message="Test query", session=mock_session):
+            results.append(chunk)
+
+        assert mock_runner.run.call_count == 2
+        assert results == ["Fallback response"]
