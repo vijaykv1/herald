@@ -101,14 +101,18 @@ class LinkedInCVParser(CVParserInterface):
 
         # lets create a simple regex to extract the section into different jobs, we will assume that each job starts
         # with a line that has the format "Title at Company (Duration)"
-        job_pattern = re.compile(
-            r"^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|"
+        month_names = (
+            r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|"
             r"January|February|March|April|May|June|July|August|"
-            r"September|October|November|December)\s+\d{4}\s*-\s*"
-            r"(?:Present|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|"
-            r"Nov|Dec|January|February|March|April|May|June|July|"
-            r"August|September|October|November|December)\s+\d{4}|\d{4})"
-            r"\s*\([^)]*\)$"
+            r"September|October|November|December)"
+        )
+        month_year = rf"{month_names}\s+\d{{4}}"
+        start_date = rf"(?:{month_year}|\d{{4}})"
+        end_date = rf"(?:Present|{month_year}|\d{{4}})"
+        job_pattern = re.compile(
+            rf"^{start_date}\s*-\s*{end_date}"
+            r"(?:\s*\([^)]*\))?$",  # duration in parentheses is optional
+            re.IGNORECASE,
         )
 
         # clean lines
@@ -120,13 +124,21 @@ class LinkedInCVParser(CVParserInterface):
         i = 0
         while i < len(lines):
             if job_pattern.match(lines[i]):
+                if i < 2:
+                    # Not enough preceding lines to extract company and title — skip safely
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "Skipping job entry at line %d — not enough preceding lines for company/title extraction.",
+                        i,
+                    )
+                    i += 1
+                    continue
+
                 company_info = lines[i - 2]
                 title_info = lines[i - 1]
                 duration_info = lines[i]
-                # location = lines[i+1]
                 description_info = []
-                i += 1  # lets move the pointer to the next line after the location line
-                # print("----> Found a job line: ", company_info)
+                i += 1  # move past the date line
                 while i < len(lines) and not job_pattern.match(lines[i]):
                     description_info.append(lines[i])
                     i += 1
@@ -136,7 +148,6 @@ class LinkedInCVParser(CVParserInterface):
                         "content": {
                             "company": company_info,
                             "title": title_info,
-                            # "location": location,
                             "duration": duration_info,
                             "description": "\n".join(description_info),
                         },

@@ -84,16 +84,16 @@ class TestLinkedInCVParser:
 
 ## Experience
 
-Senior Software Engineer
 Company A
+Senior Software Engineer
 January 2020 - Present (4 years)
 San Francisco, CA
 
 - Built microservices
 - Led team of 5 developers
 
-Software Engineer
 Company B
+Software Engineer
 June 2018 - December 2019 (1 year 7 months)
 New York, NY
 
@@ -132,8 +132,8 @@ New York, NY
     def test_parse_experience_static_method(self):
         """Test the _parse_experience static method."""
         # Use the actual LinkedIn format that the parser expects
-        experience_content = """Senior Developer
-Company A
+        experience_content = """Company A
+Senior Developer
 January 2020 - Present (4 years)
 San Francisco, CA
 
