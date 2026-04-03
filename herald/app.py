@@ -9,7 +9,7 @@ from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
 from herald.context_manager.icontext import ContextInterface
 
 _GROQ_MODEL = "openai/gpt-oss-120b"
-_FALLBACK_MODEL = "gpt-4o-mini"
+_FALLBACK_MODEL = "gpt-5-nano"
 
 logger = logging.getLogger(__name__)
 
