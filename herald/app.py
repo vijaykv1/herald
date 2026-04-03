@@ -27,7 +27,7 @@ class HeraldApp:
 
         # Add vector store retriever to the agent options if the prompt type is RAG based
         if self.prompt.type == "rag_based":
-            agent_options["tools"] = [self.prompt.context_store.create_tool()]
+            agent_options["tools"] = self.prompt.context_store.create_tools()
 
         return Agent(**agent_options)
 
@@ -46,13 +46,3 @@ class HeraldApp:
                 self.herald_agent(), message, session=session
             )
             yield result.final_output
-
-
-# import asyncio
-
-# async def current_app():
-#     h_app = HeraldApp()
-#     async for resp in h_app.run(query="Did Varun work for BMW ?"):
-#         print(resp)
-
-# asyncio.run(current_app())
