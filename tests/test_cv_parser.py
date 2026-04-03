@@ -131,7 +131,6 @@ New York, NY
 
     def test_parse_experience_static_method(self):
         """Test the _parse_experience static method."""
-        # Use the actual LinkedIn format that the parser expects
         experience_content = """Company A
 Senior Developer
 January 2020 - Present (4 years)
@@ -141,10 +140,46 @@ San Francisco, CA
 - Achievement 1
 - Achievement 2
 """
-        # This is a static method, we can test it directly
         result = LinkedInCVParser._parse_experience(experience_content)
-        # The method returns a list, not a dict
         assert isinstance(result, list)
+
+    def test_parse_experience_total_duration_line(self):
+        """Test that a LinkedIn total-duration line between company and first role is handled."""
+        experience_content = """Company A
+4 years 2 months
+Senior Developer
+January 2020 - Present (4 years)
+San Francisco, CA
+
+- Led a team of engineers
+"""
+        result = LinkedInCVParser._parse_experience(experience_content)
+        assert len(result) == 1
+        assert result[0]["content"]["company"] == "Company A"
+        assert result[0]["content"]["title"] == "Senior Developer"
+
+    def test_parse_experience_multiple_roles_same_company(self):
+        """Test that subsequent roles at the same company inherit the company name."""
+        experience_content = """Company A
+3 years
+Senior Developer
+January 2022 - Present (2 years)
+Location
+
+- Senior role description
+
+Junior Developer
+January 2020 - January 2022 (2 years)
+Location
+
+- Junior role description
+"""
+        result = LinkedInCVParser._parse_experience(experience_content)
+        assert len(result) == 2
+        assert result[0]["content"]["company"] == "Company A"
+        assert result[0]["content"]["title"] == "Senior Developer"
+        assert result[1]["content"]["company"] == "Company A"
+        assert result[1]["content"]["title"] == "Junior Developer"
 
     def test_multiple_parse_calls_consistent(self, sample_linkedin_cv):
         """Test that multiple parse calls return consistent results."""

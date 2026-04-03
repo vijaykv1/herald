@@ -115,27 +115,52 @@ class LinkedInCVParser(CVParserInterface):
             re.IGNORECASE,
         )
 
+        # Matches LinkedIn's "total time at company" lines e.g. "4 years 4 months", "10 months"
+        total_duration_pattern = re.compile(
+            r"^\d+\s+years?(?:\s+\d+\s+months?)?$|^\d+\s+months?$",
+            re.IGNORECASE,
+        )
+
         # clean lines
         lines = [
             line.strip() for line in content.splitlines() if line.strip() and not line.strip().startswith("Page ")
         ]
 
+        import logging
+        logger = logging.getLogger(__name__)
+
         jobs = []
+        last_company = None
         i = 0
         while i < len(lines):
             if job_pattern.match(lines[i]):
                 if i < 2:
-                    # Not enough preceding lines to extract company and title — skip safely
-                    import logging
-                    logging.getLogger(__name__).warning(
+                    logger.warning(
                         "Skipping job entry at line %d — not enough preceding lines for company/title extraction.",
                         i,
                     )
                     i += 1
                     continue
 
-                company_info = lines[i - 2]
                 title_info = lines[i - 1]
+
+                # LinkedIn inserts a total-duration line ("4 years 4 months") between the
+                # company name and the first role when a company has multiple roles.
+                # In that case look one line further back for the real company name.
+                if i >= 3 and total_duration_pattern.match(lines[i - 2]):
+                    company_info = lines[i - 3]
+                    last_company = company_info
+                elif last_company and (
+                    lines[i - 2].startswith("-")       # bullet from previous description
+                    or lines[i - 2].startswith("•")
+                    or len(lines[i - 2]) > 80          # long description line
+                ):
+                    # Subsequent role at the same company — company name is not repeated
+                    company_info = last_company
+                else:
+                    company_info = lines[i - 2]
+                    last_company = company_info
+
                 duration_info = lines[i]
                 description_info = []
                 i += 1  # move past the date line
