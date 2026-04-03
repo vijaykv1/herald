@@ -100,8 +100,32 @@ class CVVectorStore:
 
         return docs[0] if docs else []
 
+    def get_all_chunks_by_topic(self, topic: str) -> list:
+        """Return all stored chunks for a given topic without similarity search.
+
+        :param str topic: The topic to filter by (e.g. "Experience").
+        :return: All chunk documents for that topic.
+        :rtype: list
+        """
+        results = self.__cv_collection.get(where={"topic": topic})
+        return results.get("documents", [])
+
     def create_tools(self) -> list:
         """Create topic-specific tool wrappers for the retrieve_relevant_chunks method."""
+
+        @function_tool
+        def list_all_experience_chunks() -> list:
+            """
+            Return every work experience entry from the CV without any filtering.
+            Use this tool when the question asks for a complete list — e.g.
+            "Which companies have you worked at?", "List all your jobs",
+            "How many roles have you had?", or any question that requires
+            enumerating all experience rather than finding the most relevant one.
+
+            Returns:
+                A list of all work experience chunk texts.
+            """
+            return self.get_all_chunks_by_topic("Experience")
 
         @function_tool
         def retrieve_experience_chunks(query: str, top_k: int = 4) -> list:
@@ -185,6 +209,7 @@ class CVVectorStore:
             return self.retrieve_relevant_chunks(query, top_k)
 
         return [
+            list_all_experience_chunks,
             retrieve_experience_chunks,
             retrieve_skills_chunks,
             retrieve_education_chunks,
